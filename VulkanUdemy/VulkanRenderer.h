@@ -58,7 +58,7 @@ private:
 	
 	// Getter Functions
 	QueueFamilyIndicies getQueueFamilies(VkPhysicalDevice device);
-
+	SwapChainDetails getSwapChainDetails(VkPhysicalDevice device);
 
 };
 

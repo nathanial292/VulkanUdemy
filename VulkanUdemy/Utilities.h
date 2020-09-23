@@ -17,6 +17,12 @@ struct QueueFamilyIndicies {
 	}
 };
 
+struct SwapChainDetails {
+	VkSurfaceCapabilitiesKHR surfaceCapabilities; // Surface properties (e.g. image size/extent)
+	std::vector<VkSurfaceFormatKHR> formats;	  // Surface Image formats (e.g. RGBA and size of each colour)
+	std::vector<VkPresentModeKHR> presentationMode; // How images should be presented to screen
+};
+
 // Validation layers for Vulkan
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"

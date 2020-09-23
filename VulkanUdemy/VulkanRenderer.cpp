@@ -269,7 +269,14 @@ bool VulkanRenderer::checkDeviceSuitable(VkPhysicalDevice device)
 
 	bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-	return indicies.isValid() && extensionsSupported;
+	bool swapChainValid = false;
+	// No point checking if swapchain is valid is the extensions are supported
+	if (extensionsSupported) {
+		SwapChainDetails swapChainDetails = getSwapChainDetails(device);
+		swapChainValid = !swapChainDetails.presentationMode.empty() && !swapChainDetails.formats.empty();
+	}
+
+	return indicies.isValid() && extensionsSupported && swapChainValid;
 }
 
 bool VulkanRenderer::checkValidiationLayerSupport()
@@ -369,4 +376,33 @@ QueueFamilyIndicies VulkanRenderer::getQueueFamilies(VkPhysicalDevice device)
 	}
 
 	return indicies;
+}
+
+SwapChainDetails VulkanRenderer::getSwapChainDetails(VkPhysicalDevice device)
+{
+	SwapChainDetails swapChainDetails;
+	
+	// Get the surface capabiltiies of given surface for given physical device
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &swapChainDetails.surfaceCapabilities);
+
+	// Formats
+	uint32_t formatCount = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, nullptr);
+	
+	if (formatCount != 0) {
+		swapChainDetails.formats.resize(formatCount); // Resize vector to the supported formats for given surface
+		vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, swapChainDetails.formats.data());
+	}
+
+	// Presentation Modes
+	uint32_t presentationCount = 0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentationCount, nullptr);
+
+	if (presentationCount != 0) {
+		swapChainDetails.presentationMode.resize(presentationCount);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentationCount, swapChainDetails.presentationMode.data());
+	}
+
+
+	return swapChainDetails;
 }
