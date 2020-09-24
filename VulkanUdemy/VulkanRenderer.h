@@ -32,7 +32,7 @@ private:
 	void destroyDebugMessenger(VkAllocationCallbacks* pAllocator);
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 
-	// Main
+	// MAIN FUNCTIONS
 	struct {
 		VkPhysicalDevice physicalDevice;
 		VkDevice logicalDevice;
@@ -41,6 +41,7 @@ private:
 	VkQueue presentationQueue;
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapchain;
+	std::vector<SwapChainImage> swapChainImages;
 
 	// Utiltiy
 	VkFormat swapChainImageFormat;
@@ -57,7 +58,7 @@ private:
 	// Get Functions
 	void getPhysicalDevice();
 
-	// Support Functions
+	// SUPPORT FUNCTIONS //
 	// Checker Functions
 	bool checkInstanceExtensionSupport(std::vector<const char*>* checkExtensions);
 	bool checkDeviceSuitable(VkPhysicalDevice device);
@@ -73,5 +74,7 @@ private:
 	VkPresentModeKHR chooseBestPresentationMode(const std::vector<VkPresentModeKHR>& presentationModes);
 	VkExtent2D chooseSwapExtend(const VkSurfaceCapabilitiesKHR &surfaceCapabilities);
 
+	// Create Functions
+	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 };
 

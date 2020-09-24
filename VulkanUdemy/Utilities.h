@@ -23,6 +23,11 @@ struct SwapChainDetails {
 	std::vector<VkPresentModeKHR> presentationMode; // How images should be presented to screen
 };
 
+struct SwapChainImage {
+	VkImage image;
+	VkImageView imageView;
+};
+
 // Validation layers for Vulkan
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
