@@ -490,7 +490,6 @@ void VulkanRenderer::createSwapChain()
 		imageCount = swapChainDetails.surfaceCapabilities.maxImageCount;
 	}
 
-
 	// Creation information for swap chain
 	VkSwapchainCreateInfoKHR swapChainCreateInfo = {};
 	swapChainCreateInfo.surface = surface;
@@ -536,4 +535,7 @@ void VulkanRenderer::createSwapChain()
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create swapchain");
 	}
+
+	swapChainImageFormat = surfaceFormat.format;
+	swapChainExtent = extent;
 }

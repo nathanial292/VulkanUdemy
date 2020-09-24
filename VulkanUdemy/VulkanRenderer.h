@@ -32,6 +32,7 @@ private:
 	void destroyDebugMessenger(VkAllocationCallbacks* pAllocator);
 	void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 
+	// Main
 	struct {
 		VkPhysicalDevice physicalDevice;
 		VkDevice logicalDevice;
@@ -40,6 +41,10 @@ private:
 	VkQueue presentationQueue;
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapchain;
+
+	// Utiltiy
+	VkFormat swapChainImageFormat;
+	VkExtent2D swapChainExtent;
 
 	// Vulkan Functions
 	void createInstance();
