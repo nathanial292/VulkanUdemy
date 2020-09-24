@@ -8,6 +8,7 @@
 #include <vector>
 #include <iostream>
 #include <set>
+#include <algorithm>
 
 class VulkanRenderer
 {
@@ -38,12 +39,14 @@ private:
 	VkQueue graphicsQueue;
 	VkQueue presentationQueue;
 	VkSurfaceKHR surface;
+	VkSwapchainKHR swapchain;
 
 	// Vulkan Functions
 	void createInstance();
 	void createLogicalDevice();
 	void setupDebugMessenger();
 	void createSurface();
+	void createSwapChain();
 
 
 	// Get Functions
@@ -59,6 +62,11 @@ private:
 	// Getter Functions
 	QueueFamilyIndicies getQueueFamilies(VkPhysicalDevice device);
 	SwapChainDetails getSwapChainDetails(VkPhysicalDevice device);
+
+	// Choose Functions
+	VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
+	VkPresentModeKHR chooseBestPresentationMode(const std::vector<VkPresentModeKHR>& presentationModes);
+	VkExtent2D chooseSwapExtend(const VkSurfaceCapabilitiesKHR &surfaceCapabilities);
 
 };
 
