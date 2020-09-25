@@ -452,7 +452,7 @@ VkPresentModeKHR VulkanRenderer::chooseBestPresentationMode(const std::vector<Vk
 	return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D VulkanRenderer::chooseSwapExtend(const VkSurfaceCapabilitiesKHR& surfaceCapabilities)
+VkExtent2D VulkanRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& surfaceCapabilities)
 {
 	if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) // If current extend is at numeric limits, the extend van vary. Otherwise it is the size of the window.
 	{
@@ -483,7 +483,7 @@ void VulkanRenderer::createSwapChain()
 	// Find optimal surface values for our swapchain
 	VkSurfaceFormatKHR surfaceFormat = chooseBestSurfaceFormat(swapChainDetails.formats);
 	VkPresentModeKHR presentMode = chooseBestPresentationMode(swapChainDetails.presentationMode);
-	VkExtent2D extent = chooseSwapExtend(swapChainDetails.surfaceCapabilities);
+	VkExtent2D extent = chooseSwapExtent(swapChainDetails.surfaceCapabilities);
 
 	// How many images are in the swapchain? Get 1 more than minimum to allow triple buffering
 	uint32_t imageCount = swapChainDetails.surfaceCapabilities.minImageCount + 1;
@@ -592,6 +592,45 @@ void VulkanRenderer::createGraphicsPipeline()
 	graphicsPipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
 	// CREATE PIPELINE
+	
+	// Vertex Input (TODO: put in vertex descriptions when resources created) (currently hardcoded in shader)
+	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
+	vertexInputCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vertexInputCreateInfo.vertexBindingDescriptionCount = 0;
+	vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr; // List of vertex binding descriptions (data spacing/stride information)
+	vertexInputCreateInfo.vertexAttributeDescriptionCount = 0;
+	vertexInputCreateInfo.pVertexAttributeDescriptions = nullptr; // List of vertex attribute descriptions (data format and where to bind to/from)
+
+	// Input Assembly
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST; // Primitive type to assemble verticies
+	inputAssembly.primitiveRestartEnable = VK_FALSE; // Allow overriding of "strip" topology to start new primitives
+
+	// Viewport and Scissor
+	VkViewport viewport = {};
+	viewport.x = 0.0f; // x start coordinate
+	viewport.y = 0.0f; // y start coordinate
+	viewport.width = (float)swapChainExtent.width; // width of viewport
+	viewport.height = (float)swapChainExtent.height; // height of viewport
+	viewport.minDepth = 0.0f; // Min framebuffer depth
+	viewport.maxDepth = 1.0f; // Max framebuffer depth
+
+	// Create a scissor info struct
+	VkRect2D scissor = {};
+	scissor.offset = { 0, 0 }; // Offset to use region from
+	scissor.extent = swapChainExtent; // Extent to describe region to use, starting at offset
+
+	// Viewport and scissor info struct
+	VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {};
+	viewportStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportStateCreateInfo.viewportCount = 1;
+	viewportStateCreateInfo.pViewports = &viewport;
+	viewportStateCreateInfo.scissorCount = 1;
+	viewportStateCreateInfo.pScissors = &scissor;
+
+	// Dyanamic states to enable (Change values in runtime instead of hardcoding pipeline)
+	std::vector<VkDynamicState> dyanamicStateEnables; 
 
 	// Destroy shader modules after pipeline (no longer needed after pipeline created)
 	vkDestroyShaderModule(mainDevice.logicalDevice, vertShaderModule, nullptr);
