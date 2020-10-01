@@ -29,6 +29,19 @@ struct SwapChainImage {
 	VkImageView imageView;
 };
 
+template <class T>
+T findLargest(T arg1, T arg2) {
+	return ((arg1 > arg2) ? arg1 : arg2);
+}
+
+template <class T>
+T swapData(T &n1, T &n2) {
+	T temp;
+	temp = n2;
+	n2 = n1;
+	n1 = temp;
+}
+
 // Validation layers for Vulkan
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
