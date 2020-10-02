@@ -60,8 +60,8 @@ private:
 	VkExtent2D swapChainExtent;
 
 	// Synchronisation
-	std::vector<VkSemaphore> imageAvailable;
-	std::vector<VkSemaphore> renderFinished;
+	VkSemaphore imageAvailable;
+	VkSemaphore renderFinished;
 
 	// Vulkan Functions
 	void createInstance();
