@@ -21,6 +21,7 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		createCommandPool();
 		createCommandBuffers();
 		recordCommands();
+		createSynchronisation();
 	}
 	catch (const std::runtime_error& e) {
 		printf("ERROR: %s\n", e.what());
@@ -30,8 +31,55 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 	return 0;
 }
 
+void VulkanRenderer::draw()
+{
+	// GET NEXT IMAGE
+	uint32_t imageIndex;
+	vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain, std::numeric_limits<uint64_t>::max(), imageAvailable, VK_NULL_HANDLE, &imageIndex);
+	
+	// SUBMIT COMMAND BUFFER FOR EXECUTION
+	VkSubmitInfo submitInfo = {};
+	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+	submitInfo.waitSemaphoreCount = 1; // Number of semaphores to wait on
+	submitInfo.pWaitSemaphores = &imageAvailable; // List of semaphores to wait on
+	VkPipelineStageFlags waitStages[] = {
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+	};
+	submitInfo.pWaitDstStageMask = waitStages; // stages to check semaphores at
+	submitInfo.commandBufferCount = 1; // Number of command buffers to submit
+	submitInfo.pCommandBuffers = &commandBuffers[imageIndex]; // Command buffer to submit
+	submitInfo.signalSemaphoreCount = 1; // Number of semaphore to signal
+	submitInfo.pSignalSemaphores = &renderFinished; // Semaphores to signal when command buffer finishes
+
+	// Submit command buffer to queue
+	VkResult result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to submit command buffer to queue");
+	}
+
+	// PRESENT RENDERED IMAGE TO SCREEN
+	VkPresentInfoKHR presentInfo = {};
+	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+	presentInfo.waitSemaphoreCount = 1; // Number of semaphores to wait on
+	presentInfo.pWaitSemaphores = &renderFinished; // Semaphores to wait on
+	presentInfo.swapchainCount = 1; // Number of swapchains to present to
+	presentInfo.pSwapchains = &swapchain; // Swapchains to present images to
+	presentInfo.pImageIndices = &imageIndex; // Index of images in swapchains to present 
+
+	result = vkQueuePresentKHR(presentationQueue, &presentInfo);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to present image!");
+	}
+
+	// 1. Get the next available image to draw to and set something to signal when we're finished with the image (semaphore) (Signal when ready to draw to)
+	// 2. Submit command buffer to queue for execution, making sure it waits for image to be signalled as available before drawing and signals when it has finished rendering (Wait for previous signal to start drawing, finished drawing also signal)
+	// 3. Present image to screen when it has signalled finished rendering
+}
+
 void VulkanRenderer::cleanup()
 {
+	vkDestroySemaphore(mainDevice.logicalDevice, renderFinished, nullptr);
+	vkDestroySemaphore(mainDevice.logicalDevice, imageAvailable, nullptr);
 	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool, nullptr);
 	for (auto framebuffer : swapChainFramebuffers) {
 		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
@@ -863,6 +911,18 @@ void VulkanRenderer::createCommandBuffers()
 	}
 }
 
+void VulkanRenderer::createSynchronisation()
+{
+	// Semaphore creation information
+	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+	if (vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailable) != VK_SUCCESS ||
+		vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinished) != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create a sempahore!");
+	}
+}
+
 void VulkanRenderer::recordCommands()
 {
 	// Information about how to begin each command buffer
@@ -940,8 +1000,8 @@ VkShaderModule VulkanRenderer::createShaderModule(const std::vector<char>& code)
 	// Shader module creation info
 	VkShaderModuleCreateInfo shaderModuleCreateInfo = {};
 	shaderModuleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-	shaderModuleCreateInfo.codeSize = code.size();
-	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(code.data());
+	shaderModuleCreateInfo.codeSize = code.size(); // Size of code
+	shaderModuleCreateInfo.pCode = reinterpret_cast<const uint32_t *>(code.data()); // Pointer to code (uint32_t pointer type)
 
 	VkShaderModule shaderModule;
 	VkResult result = vkCreateShaderModule(mainDevice.logicalDevice, &shaderModuleCreateInfo, nullptr, &shaderModule);
