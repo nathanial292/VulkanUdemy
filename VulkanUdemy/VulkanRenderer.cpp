@@ -32,16 +32,20 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 }
 
 void VulkanRenderer::draw()
-{
+{	
+	// Stop running code until the fence is opened, only opened when the frame is finished drawing
+	vkWaitForFences(mainDevice.logicalDevice, 1, &drawFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
+	vkResetFences(mainDevice.logicalDevice, 1, &drawFences[currentFrame]); // Unsignal fence (close it so other frames can't eneter)
+
 	// GET NEXT IMAGE
 	uint32_t imageIndex;
-	vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain, std::numeric_limits<uint64_t>::max(), imageAvailable, VK_NULL_HANDLE, &imageIndex);
-	
+	vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain, std::numeric_limits<uint64_t>::max(), imageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
 	// SUBMIT COMMAND BUFFER FOR EXECUTION
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 	submitInfo.waitSemaphoreCount = 1; // Number of semaphores to wait on
-	submitInfo.pWaitSemaphores = &imageAvailable; // List of semaphores to wait on
+	submitInfo.pWaitSemaphores = &imageAvailable[currentFrame]; // List of semaphores to wait on
 	VkPipelineStageFlags waitStages[] = {
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
 	};
@@ -49,10 +53,10 @@ void VulkanRenderer::draw()
 	submitInfo.commandBufferCount = 1; // Number of command buffers to submit
 	submitInfo.pCommandBuffers = &commandBuffers[imageIndex]; // Command buffer to submit
 	submitInfo.signalSemaphoreCount = 1; // Number of semaphore to signal
-	submitInfo.pSignalSemaphores = &renderFinished; // Semaphores to signal when command buffer finishes
+	submitInfo.pSignalSemaphores = &renderFinished[currentFrame]; // Semaphores to signal when command buffer finishes
 
 	// Submit command buffer to queue
-	VkResult result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+	VkResult result = vkQueueSubmit(graphicsQueue, 1, &submitInfo, drawFences[currentFrame]);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to submit command buffer to queue");
 	}
@@ -61,27 +65,29 @@ void VulkanRenderer::draw()
 	VkPresentInfoKHR presentInfo = {};
 	presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
 	presentInfo.waitSemaphoreCount = 1; // Number of semaphores to wait on
-	presentInfo.pWaitSemaphores = &renderFinished; // Semaphores to wait on
+	presentInfo.pWaitSemaphores = &renderFinished[currentFrame]; // Semaphores to wait on
 	presentInfo.swapchainCount = 1; // Number of swapchains to present to
 	presentInfo.pSwapchains = &swapchain; // Swapchains to present images to
-	presentInfo.pImageIndices = &imageIndex; // Index of images in swapchains to present 
+	presentInfo.pImageIndices = &imageIndex; // Index of images in swapchains to present
 
 	result = vkQueuePresentKHR(presentationQueue, &presentInfo);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to present image!");
 	}
 
-	// 1. Get the next available image to draw to and set something to signal when we're finished with the image (semaphore) (Signal when ready to draw to)
-	// 2. Submit command buffer to queue for execution, making sure it waits for image to be signalled as available before drawing and signals when it has finished rendering (Wait for previous signal to start drawing, finished drawing also signal)
-	// 3. Present image to screen when it has signalled finished rendering
+	// Get next frame (use modulo MAX_FRAME_DRAWS to keep value below MAX_FRAME_DRAWS)
+	currentFrame = (currentFrame + 1) % MAX_FRAME_DRAWS;
 }
 
 void VulkanRenderer::cleanup()
 {
 	// Wait until no actions being run on device before cleanup
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
-	vkDestroySemaphore(mainDevice.logicalDevice, renderFinished, nullptr);
-	vkDestroySemaphore(mainDevice.logicalDevice, imageAvailable, nullptr);
+	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++) {
+		vkDestroySemaphore(mainDevice.logicalDevice, renderFinished[i], nullptr);
+		vkDestroySemaphore(mainDevice.logicalDevice, imageAvailable[i], nullptr);
+		vkDestroyFence(mainDevice.logicalDevice, drawFences[i], nullptr);
+	}
 	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool, nullptr);
 	for (auto framebuffer : swapChainFramebuffers) {
 		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
@@ -915,13 +921,25 @@ void VulkanRenderer::createCommandBuffers()
 
 void VulkanRenderer::createSynchronisation()
 {
+	imageAvailable.resize(MAX_FRAME_DRAWS);
+	renderFinished.resize(MAX_FRAME_DRAWS);
+	drawFences.resize(MAX_FRAME_DRAWS);
+
 	// Semaphore creation information
 	VkSemaphoreCreateInfo semaphoreCreateInfo = {};
 	semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-	if (vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailable) != VK_SUCCESS ||
-		vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinished) != VK_SUCCESS) {
-		throw std::runtime_error("Failed to create a sempahore!");
+	// Fence creation information
+	VkFenceCreateInfo fenceCreateInfo = {};
+	fenceCreateInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+	fenceCreateInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++) {
+		if (vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &imageAvailable[i]) != VK_SUCCESS ||
+			vkCreateSemaphore(mainDevice.logicalDevice, &semaphoreCreateInfo, nullptr, &renderFinished[i]) != VK_SUCCESS ||
+			vkCreateFence(mainDevice.logicalDevice, &fenceCreateInfo, nullptr, &drawFences[i]) != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create a sempahore and/or Fence!");
+		}
 	}
 }
 
