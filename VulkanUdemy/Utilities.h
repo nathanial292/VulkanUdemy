@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <glm/glm.hpp>
 
 const int MAX_FRAME_DRAWS = 2;
 
@@ -31,18 +32,9 @@ struct SwapChainImage {
 	VkImageView imageView;
 };
 
-template <class T>
-T findLargest(T arg1, T arg2) {
-	return ((arg1 > arg2) ? arg1 : arg2);
-}
-
-template <class T>
-T swapData(T &n1, T &n2) {
-	T temp;
-	temp = n2;
-	n2 = n1;
-	n1 = temp;
-}
+struct Vertex {
+	glm::vec3 pos; // vertex position (x,y,z)
+};
 
 // Validation layers for Vulkan
 const std::vector<const char*> validationLayers = {
