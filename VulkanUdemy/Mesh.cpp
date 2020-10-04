@@ -10,7 +10,7 @@ Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, std::vector<V
 	vertexCount = vertices->size();
 	physicalDevice = newPhysicalDevice;
 	device = newDevice;
-	vertexBuffer = createVertexBuffer(vertices);
+	createVertexBuffer(vertices);
 }
 
 int Mesh::getVertexCount()
@@ -72,8 +72,6 @@ VkBuffer Mesh::createVertexBuffer(std::vector<Vertex>* vertices)
 	vkMapMemory(device, vertexBufferMemory, 0, bufferCreateInfo.size, 0, &data); // Map the vertex buffer memory to that point
 	memcpy(data, vertices->data(), (size_t)bufferCreateInfo.size); // Copy memory from vertices vector to that point
 	vkUnmapMemory(device, vertexBufferMemory); // Unmap the vertex buffer memory
-
-
 }
 
 uint32_t Mesh::findMemoryTypeIndex(uint32_t allowedTypes, VkMemoryPropertyFlags properties)
