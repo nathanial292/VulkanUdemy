@@ -34,6 +34,7 @@ struct SwapChainImage {
 
 struct Vertex {
 	glm::vec3 pos; // vertex position (x,y,z)
+	glm::vec3 col; // vertex color (r,g,b)
 };
 
 // Validation layers for Vulkan

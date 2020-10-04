@@ -17,9 +17,14 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 
 		// Create a mesh
 		std::vector<Vertex> meshVertices = {
-			{{0.0, -0.4, 0.0}},
-			{{0.4, 0.4, 0.0}},
-			{{-0.4, 0.4, 0.0}}
+			{{0.4, -0.4, 0.0}, {1.0f, 0.0f, 0.0f}},
+			{{0.4, 0.4, 0.0}, {0.0f, 1.0f, 0.0f}},
+			{{-0.4, 0.4, 0.0}, {0.0f, 0.0f, 1.0f}},
+
+			{{-0.4, 0.4, 0.0}, {0.0f, 0.0f, 1.0f}},
+			{{-0.4, -0.4, 0.0}, {1.0f, 0.5f, 0.0f}},
+			{{0.4, -0.4, 0.0}, {1.0f, 0.0f, 0.0f}},
+
 		};
 		firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, &meshVertices);
 
@@ -744,11 +749,19 @@ void VulkanRenderer::createGraphicsPipeline()
 	//VK_VERTEX_INPUT_RATE_INSTANCE: Move to a vertex for the next instance (If you have multiple instances of the same object) - draws the first vertex of each
 
 	// How the data for an attribute is defined within a vertex
-	std::array<VkVertexInputAttributeDescription, 1> attributeDescriptions;
+	std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions;
+
+	// Position attribute
 	attributeDescriptions[0].binding = 0; // Which binding the data is at (should be the same as above binding value)
 	attributeDescriptions[0].location = 0; // Location in shader where data will be read from
 	attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT; // Format the data will take (also helps define the size of data)
 	attributeDescriptions[0].offset = offsetof(Vertex, pos); // Where the attribute is defined in the data for a single vertex
+
+	// Color Attribute
+	attributeDescriptions[1].binding = 0; 
+	attributeDescriptions[1].location = 1; 
+	attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT; 
+	attributeDescriptions[1].offset = offsetof(Vertex, col);
 
 	// Vertex Input
 	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};
