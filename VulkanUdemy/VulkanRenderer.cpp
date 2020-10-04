@@ -999,8 +999,14 @@ void VulkanRenderer::recordCommands()
 
 			// Bind Pipeline to be used in renderpass
 			vkCmdBindPipeline(commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+			// Bind our vertex buffer
+			VkBuffer vertexBuffers[] = { firstMesh.getVertexBuffer() }; // Buffers to bind
+			VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+			vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
+
 			// Execute our pipeline
-			vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+			vkCmdDraw(commandBuffers[i], static_cast<uint32_t>(firstMesh.getVertexCount()), 1, 0, 0);
 
 		vkCmdEndRenderPass(commandBuffers[i]);
 
