@@ -59,13 +59,21 @@ VkBuffer Mesh::createVertexBuffer(std::vector<Vertex>* vertices)
 		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); // VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT: The buffer is visible to the CPU 
 																					 // VK_MEMORY_PROPERTY_HOST_COHERENT_BIT: Allows placement of data straight into buffer after mapping (otherwise would have to specify manually)
 	// Allocate memory to VkDeviceMemory
-	VkResult result = vkAllocateMemory(device, &memoryAllocInfo, nullptr, &vertexBufferMemory);
+	result = vkAllocateMemory(device, &memoryAllocInfo, nullptr, &vertexBufferMemory);
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to allocate memory for vertex buffer");
 	}
 
 	// Allocate memory to given vertex buffer
 	vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+
+	// Map memory to vertex buffer
+	void *data; // Create a pointer to point in normal memory
+	vkMapMemory(device, vertexBufferMemory, 0, bufferCreateInfo.size, 0, &data); // Map the vertex buffer memory to that point
+	memcpy(data, vertices->data(), (size_t)bufferCreateInfo.size); // Copy memory from vertices vector to that point
+	vkUnmapMemory(device, vertexBufferMemory); // Unmap the vertex buffer memory
+
+
 }
 
 uint32_t Mesh::findMemoryTypeIndex(uint32_t allowedTypes, VkMemoryPropertyFlags properties)

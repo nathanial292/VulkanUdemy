@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include "Utilities.h"
+#include "Mesh.h"
 
 #include <stdexcept>
 #include <vector>
@@ -26,6 +27,10 @@ private:
 	GLFWwindow* window;
 
 	int currentFrame = 0;
+
+	// Scene objects
+	Mesh firstMesh;
+
 
 	// Vulkan Components
 	VkInstance instance;

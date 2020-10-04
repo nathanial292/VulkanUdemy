@@ -14,6 +14,15 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		createSurface();
 		getPhysicalDevice();
 		createLogicalDevice();
+
+		// Create a mesh
+		std::vector<Vertex> meshVertices = {
+			{{0.0, -0.4, 0.0}},
+			{{0.4, 0.4, 0.0}},
+			{{-0.4, 0.4, 0.0}}
+		};
+		firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, &meshVertices);
+
 		createSwapChain();
 		createRenderPass();
 		createGraphicsPipeline();
@@ -83,6 +92,8 @@ void VulkanRenderer::cleanup()
 {
 	// Wait until no actions being run on device before cleanup
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
+
+	firstMesh.destroyVertexBuffer();
 	for (size_t i = 0; i < MAX_FRAME_DRAWS; i++) {
 		vkDestroySemaphore(mainDevice.logicalDevice, renderFinished[i], nullptr);
 		vkDestroySemaphore(mainDevice.logicalDevice, imageAvailable[i], nullptr);
