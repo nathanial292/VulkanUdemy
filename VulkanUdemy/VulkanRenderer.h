@@ -29,8 +29,7 @@ private:
 	int currentFrame = 0;
 
 	// Scene objects
-	Mesh firstMesh;
-
+	std::vector<Mesh> meshList;
 
 	// Vulkan Components
 	VkInstance instance;
