@@ -5,6 +5,9 @@
 #include "Utilities.h"
 #include "Mesh.h"
 
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
 #include <stdexcept>
 #include <vector>
 #include <iostream>
@@ -18,6 +21,9 @@ public:
 	VulkanRenderer();
 
 	int init(GLFWwindow* newWindow);
+
+	void updateModel(glm::mat4 newModel);
+
 	void draw();
 	void cleanup();
 
@@ -65,6 +71,23 @@ private:
 	VkFormat swapChainImageFormat;
 	VkExtent2D swapChainExtent;
 
+	// Scene Settings
+	struct MVP {
+		glm::mat4 projection;
+		glm::mat4 view;
+		glm::mat4 model;
+	} mvp;
+
+	// Descriptors
+	VkDescriptorSetLayout descriptorSetLayout;
+
+	VkDescriptorPool descriptorPool;
+	std::vector<VkDescriptorSet> descriptorSets;
+
+	// Uniform Buffers
+	std::vector<VkBuffer> uniformBuffer;
+	std::vector<VkDeviceMemory> uniformBufferMemory;
+
 	// Synchronisation
 	std::vector<VkSemaphore> imageAvailable;
 	std::vector<VkSemaphore> renderFinished;
@@ -77,11 +100,18 @@ private:
 	void createSurface();
 	void createSwapChain();
 	void createRenderPass();
+	void createDescriptorSetLayout();
 	void createGraphicsPipeline();
 	void createFrameBuffers();
 	void createCommandPool();
 	void createCommandBuffers();
 	void createSynchronisation();
+
+	void createUniformBuffers();
+	void createDescriptorPool();
+	void createDescriptorSets();
+
+	void updateUniformBuffer(uint32_t imageIndex);
 
 	// Record functions
 	void recordCommands();
