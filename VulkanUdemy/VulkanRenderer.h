@@ -22,6 +22,8 @@ public:
 
 	int init(GLFWwindow* newWindow);
 
+	void updateModel(int modelId, glm::mat4 newModel);
+
 	void draw();
 	void cleanup();
 
