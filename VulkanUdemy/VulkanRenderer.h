@@ -22,8 +22,6 @@ public:
 
 	int init(GLFWwindow* newWindow);
 
-	void updateModel(glm::mat4 newModel);
-
 	void draw();
 	void cleanup();
 
@@ -72,11 +70,10 @@ private:
 	VkExtent2D swapChainExtent;
 
 	// Scene Settings
-	struct MVP {
+	struct UboViewProjection {
 		glm::mat4 projection;
 		glm::mat4 view;
-		glm::mat4 model;
-	} mvp;
+	} uboViewProjection;
 
 	// Descriptors
 	VkDescriptorSetLayout descriptorSetLayout;
@@ -84,9 +81,17 @@ private:
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
 
-	// Uniform Buffers
-	std::vector<VkBuffer> uniformBuffer;
-	std::vector<VkDeviceMemory> uniformBufferMemory;
+	// Uniform Buffers (Static for every model)
+	std::vector<VkBuffer> vpUniformBuffer;
+	std::vector<VkDeviceMemory> vpUniformBufferMemory;
+	
+	// Dynamic uniform buffers (Changes between each mesh)
+	std::vector<VkBuffer> modelDUniformBuffer;
+	std::vector<VkDeviceMemory> modelDUniformBufferMemory;
+
+	VkDeviceSize minUniformBufferOffset;
+	size_t modelUniformAlignment;
+	UboModel* modelTransferSpace;
 
 	// Synchronisation
 	std::vector<VkSemaphore> imageAvailable;
@@ -111,13 +116,16 @@ private:
 	void createDescriptorPool();
 	void createDescriptorSets();
 
-	void updateUniformBuffer(uint32_t imageIndex);
+	void updateUniformBuffers(uint32_t imageIndex);
 
 	// Record functions
 	void recordCommands();
 
 	// Get Functions
 	void getPhysicalDevice();
+
+	// Allocate Functions
+	void allocateDynamicBufferTransferSpace();
 
 	// SUPPORT FUNCTIONS //
 	// Checker Functions

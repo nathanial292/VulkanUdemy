@@ -50,7 +50,7 @@ int main()
 		angle += 10.0f * deltaTime;
 		if (angle > 360.0f) angle = 0.0f;
 
-		vulkanRenderer.updateModel(glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f)));
+		//vulkanRenderer.updateModel(glm::rotate(glm::mat4(1.0f), glm::radians(angle), glm::vec3(0.0f, 0.0f, 1.0f)));
 		vulkanRenderer.draw();
 	}
 

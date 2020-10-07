@@ -18,6 +18,8 @@ Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue trans
 	device = newDevice;
 	createVertexBuffer(transferQueue, transferCommandPool, vertices);
 	createIndexBuffer(transferQueue, transferCommandPool, indices);
+
+	uboModel.model = glm::mat4(1.0f);
 }
 
 int Mesh::getVertexCount()
@@ -47,6 +49,16 @@ void Mesh::destroyBuffers()
 
 	vkDestroyBuffer(device, indexBuffer, nullptr);
 	vkFreeMemory(device, indexBufferMemory, nullptr);
+}
+
+void Mesh::setModel(glm::mat4 newModel)
+{
+	uboModel.model = newModel;
+}
+
+UboModel Mesh::getModel()
+{
+	return uboModel;
 }
 
 void Mesh::createVertexBuffer(VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<Vertex>* vertices)
