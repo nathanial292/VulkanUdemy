@@ -80,6 +80,8 @@ private:
 	// Descriptors
 	VkDescriptorSetLayout descriptorSetLayout;
 
+	VkPushConstantRange pushConstantRange;
+
 	VkDescriptorPool descriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
 
@@ -93,7 +95,7 @@ private:
 
 	VkDeviceSize minUniformBufferOffset;
 	size_t modelUniformAlignment;
-	UboModel* modelTransferSpace;
+	Model* modelTransferSpace;
 
 	// Synchronisation
 	std::vector<VkSemaphore> imageAvailable;
@@ -108,6 +110,7 @@ private:
 	void createSwapChain();
 	void createRenderPass();
 	void createDescriptorSetLayout();
+	void createPushConstantRange();
 	void createGraphicsPipeline();
 	void createFrameBuffers();
 	void createCommandPool();
@@ -121,7 +124,7 @@ private:
 	void updateUniformBuffers(uint32_t imageIndex);
 
 	// Record functions
-	void recordCommands();
+	void recordCommands(uint32_t currentImage);
 
 	// Get Functions
 	void getPhysicalDevice();
