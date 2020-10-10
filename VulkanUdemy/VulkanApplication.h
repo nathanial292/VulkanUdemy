@@ -1,3 +1,5 @@
+#pragma once
+
 #define GLFW_INCLUDE_VULKAN
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <GLFW/glfw3.h>
@@ -8,12 +10,17 @@
 
 #include "VulkanRenderer.h"
 
-class Main {
+class VulkanApplication {
 public:
-	Main() {
-		gameLoop();
-	}
 
+	VulkanApplication() {
+		initWindow();
+		createGameLoop();
+	}
+	~VulkanApplication();
+
+	GLFWwindow* window;
+	VulkanRenderer vulkanRenderer;
 
 	void initWindow(std::string wName = "Test Window", const int width = 800, const int height = 600)
 	{
@@ -30,12 +37,11 @@ public:
 	}
 
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-		std::cout << "Hello";
 		auto app = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
 		app->frameBufferResized = true;
 	}
 
-	int gameLoop()
+	int createGameLoop()
 	{
 		// Create window
 		initWindow("Test Window", 800, 600);
@@ -86,12 +92,4 @@ public:
 
 		return 0;
 	}
-
-private:
-	GLFWwindow* window;
-	VulkanRenderer vulkanRenderer;
 };
-
-int main() {
-	Main main;
-}

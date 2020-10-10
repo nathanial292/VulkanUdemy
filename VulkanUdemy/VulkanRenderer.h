@@ -28,12 +28,15 @@ public:
 	void cleanup();
 	void cleanupSwapChain();
 
+	bool frameBufferResized = false;
+
 	~VulkanRenderer();
 
 private:
 	GLFWwindow* window;
 
 	int currentFrame = 0;
+
 
 	// Scene objects
 	std::vector<Mesh> meshList;
