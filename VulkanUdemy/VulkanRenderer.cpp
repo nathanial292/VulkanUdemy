@@ -19,11 +19,11 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		getPhysicalDevice();
 		createLogicalDevice();
 		createSwapChain();
+		createDepthBufferImage();
 		createRenderPass();
 		createDescriptorSetLayout();
 		createPushConstantRange();
 		createGraphicsPipeline();
-		createDepthBufferImage();
 		createFrameBuffers();
 		createCommandPool();
 
