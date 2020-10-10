@@ -26,6 +26,7 @@ public:
 
 	void draw();
 	void cleanup();
+	void cleanupSwapChain();
 
 	~VulkanRenderer();
 
@@ -113,19 +114,21 @@ private:
 	void setupDebugMessenger();
 	void createSurface();
 	void createSwapChain();
+	void createDepthBufferImage();
 	void createRenderPass();
 	void createDescriptorSetLayout();
 	void createPushConstantRange();
 	void createGraphicsPipeline();
-	void createDepthBufferImage();
 	void createFrameBuffers();
 	void createCommandPool();
 	void createCommandBuffers();
 	void createSynchronisation();
-
 	void createUniformBuffers();
 	void createDescriptorPool();
 	void createDescriptorSets();
+
+	// Recreate functions
+	void recreateSwapChain();
 
 	void updateUniformBuffers(uint32_t imageIndex);
 

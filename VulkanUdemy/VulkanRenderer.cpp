@@ -78,6 +78,16 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 	return 0;
 }
 
+void VulkanRenderer::recreateSwapChain()
+{
+	cleanupSwapChain();
+	createSwapChain();
+	createRenderPass();
+	createGraphicsPipeline();
+	createFrameBuffers();
+	createCommandBuffers();
+}
+
 void VulkanRenderer::updateModel(int modelId, glm::mat4 newModel)
 {
 	if (modelId >= meshList.size()) return;
@@ -140,6 +150,9 @@ void VulkanRenderer::cleanup()
 	// Wait until no actions being run on device before cleanup
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
+	// Clean up all components of the swapchain, render pass, graphics pipeline, command buffers, image views
+	cleanupSwapChain();
+
 	// C style memory free for dynamic descriptor sets
 	_aligned_free(modelTransferSpace);
 
@@ -165,9 +178,20 @@ void VulkanRenderer::cleanup()
 		vkDestroyFence(mainDevice.logicalDevice, drawFences[i], nullptr);
 	}
 	vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool, nullptr);
+
+	vkDestroySurfaceKHR(instance, surface, nullptr);
+	if (enableValidationLayers) {
+		destroyDebugMessenger(nullptr);
+	}
+	vkDestroyDevice(mainDevice.logicalDevice, nullptr);
+	vkDestroyInstance(instance, nullptr);
+}
+
+void VulkanRenderer::cleanupSwapChain() {
 	for (auto framebuffer : swapChainFramebuffers) {
 		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
 	}
+	vkFreeCommandBuffers(mainDevice.logicalDevice, graphicsCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 	vkDestroyPipeline(mainDevice.logicalDevice, graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout, nullptr);
 	vkDestroyRenderPass(mainDevice.logicalDevice, renderPass, nullptr);
@@ -175,12 +199,6 @@ void VulkanRenderer::cleanup()
 		vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
 	}
 	vkDestroySwapchainKHR(mainDevice.logicalDevice, swapchain, nullptr);
-	vkDestroySurfaceKHR(instance, surface, nullptr);
-	if (enableValidationLayers) {
-		destroyDebugMessenger(nullptr);
-	}
-	vkDestroyDevice(mainDevice.logicalDevice, nullptr);
-	vkDestroyInstance(instance, nullptr);
 }
 
 void VulkanRenderer::createInstance()
