@@ -89,6 +89,7 @@ void VulkanRenderer::recreateSwapChain()
 
 	cleanupSwapChain();
 	createSwapChain();
+	createDepthBufferImage();
 	createRenderPass();
 	createGraphicsPipeline();
 	createFrameBuffers();
@@ -102,11 +103,6 @@ void VulkanRenderer::cleanup()
 
 	// C style memory free for dynamic descriptor sets
 	_aligned_free(modelTransferSpace);
-
-	// Cleanup for depth buffer
-	vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView, nullptr);
-	vkDestroyImage(mainDevice.logicalDevice, depthBufferImage, nullptr);
-	vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory, nullptr);
 
 	vkDestroyDescriptorPool(mainDevice.logicalDevice, descriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, descriptorSetLayout, nullptr);
@@ -137,6 +133,11 @@ void VulkanRenderer::cleanup()
 void VulkanRenderer::cleanupSwapChain() {
 	// Wait until no actions being run on device before cleanup
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
+
+	// Cleanup for depth buffer
+	vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView, nullptr);
+	vkDestroyImage(mainDevice.logicalDevice, depthBufferImage, nullptr);
+	vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory, nullptr);
 
 	for (auto framebuffer : swapChainFramebuffers) {
 		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
@@ -743,7 +744,7 @@ void VulkanRenderer::createSwapChain()
 	}
 
 	// If old swapchain has been destroyed, and this one replaces it, then quickly hand over responsibilities.
-	swapChainCreateInfo.oldSwapchain = swapchain;
+	swapChainCreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
 	// Create swapchain
 	VkResult result = vkCreateSwapchainKHR(mainDevice.logicalDevice, &swapChainCreateInfo, nullptr, &swapchain);
@@ -1067,8 +1068,6 @@ void VulkanRenderer::createDepthBufferImage()
 
 	// Create depth buffer image view
 	depthBufferImageView = createImageView(depthBufferImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
-
-
 }
 
 void VulkanRenderer::createFrameBuffers()
