@@ -30,7 +30,6 @@ public:
 	}
 
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-		std::cout << "Hello";
 		auto app = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
 		app->frameBufferResized = true;
 	}

@@ -134,9 +134,7 @@ void VulkanRenderer::cleanupSwapChain() {
 	// Wait until no actions being run on device before cleanup
 	vkDeviceWaitIdle(mainDevice.logicalDevice);
 
-
 	vkFreeCommandBuffers(mainDevice.logicalDevice, graphicsCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
-
 
 	for (auto framebuffer : swapChainFramebuffers) {
 		vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
@@ -151,8 +149,10 @@ void VulkanRenderer::cleanupSwapChain() {
 	vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory, nullptr);
 
 	for (auto image : swapChainImages) {
+		vkDestroyImage(mainDevice.logicalDevice, image.image, nullptr);
 		vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
 	}
+	swapChainImages.clear();
 	vkDestroySwapchainKHR(mainDevice.logicalDevice, swapchain, nullptr);
 }
 
