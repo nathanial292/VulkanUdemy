@@ -14,6 +14,10 @@ public:
 		gameLoop();
 	}
 
+	VulkanRenderer getVulkanRenderer() {
+		return vulkanRenderer;
+	}
+
 
 	void initWindow(std::string wName = "Test Window", const int width = 800, const int height = 600)
 	{
@@ -30,8 +34,9 @@ public:
 	}
 
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-		auto app = reinterpret_cast<VulkanRenderer*>(glfwGetWindowUserPointer(window));
-		app->frameBufferResized = true;
+		auto app = reinterpret_cast<Main*>(glfwGetWindowUserPointer(window));
+		VulkanRenderer renderer = app->getVulkanRenderer();
+		renderer.setFrameBufferResize(true);
 	}
 
 	int gameLoop()

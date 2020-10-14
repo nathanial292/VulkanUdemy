@@ -172,7 +172,8 @@ void VulkanRenderer::draw()
 	uint32_t imageIndex;
 	VkResult result = vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain, std::numeric_limits<uint64_t>::max(), imageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
-	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || frameBufferResized) {
+		frameBufferResized = false;
 		recreateSwapChain();
 		return;
 	}

@@ -28,7 +28,9 @@ public:
 	void cleanup();
 	void cleanupSwapChain();
 
-	bool frameBufferResized = false;
+	void setFrameBufferResize(bool flag) {
+		frameBufferResized = flag;
+	}
 
 	~VulkanRenderer();
 
@@ -36,7 +38,7 @@ private:
 	GLFWwindow* window;
 
 	int currentFrame = 0;
-
+	bool frameBufferResized = false;
 
 	// Scene objects
 	std::vector<Mesh> meshList;
