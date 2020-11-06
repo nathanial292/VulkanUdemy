@@ -18,8 +18,11 @@ public:
 		VkQueue transferQueue, 
 		VkCommandPool transferCommandPool,
 		std::vector<uint32_t> * indices, 
-		std::vector<Vertex> * vertices);
+		std::vector<Vertex> * vertices,
+		int newTexId);
 	
+	int getTexId();
+
 	int getVertexCount();
 	VkBuffer getVertexBuffer();
 
@@ -34,6 +37,7 @@ public:
 	~Mesh();
 private:
 	Model model;
+	int texId;
 
 	int vertexCount;
 	VkBuffer vertexBuffer;

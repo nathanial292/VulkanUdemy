@@ -72,9 +72,12 @@ private:
 	VkImageView depthBufferImageView;
 	VkFormat depthBufferFormat;
 
+	VkSampler textureSampler;
+
 	// Assets
 	std::vector<VkImage> textureImages;
 	std::vector<VkDeviceMemory> textureImageMemory;
+	std::vector<VkImageView> textureImageViews;
 
 	// Pipeline
 	VkPipelineLayout pipelineLayout;
@@ -96,11 +99,14 @@ private:
 
 	// Descriptors
 	VkDescriptorSetLayout descriptorSetLayout;
+	VkDescriptorSetLayout samplerSetLayout;
 
 	VkPushConstantRange pushConstantRange;
 
 	VkDescriptorPool descriptorPool;
+	VkDescriptorPool samplerDescriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
+	std::vector<VkDescriptorSet> samplerDescriptorSets;
 
 	// Uniform Buffers (Static for every model)
 	std::vector<VkBuffer> vpUniformBuffer;
@@ -137,6 +143,7 @@ private:
 	void createUniformBuffers();
 	void createDescriptorPool();
 	void createDescriptorSets();
+	void createTextureSampler();
 
 	// Recreate functions
 	void recreateSwapChain();
@@ -174,7 +181,9 @@ private:
 	VkShaderModule createShaderModule(const std::vector<char> &code);
 	VkImage createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory * imageMemory);
 
+	int createTextureImage(std::string fileName);
 	int createTexture(std::string fileName);
+	int createTextureDescriptor(VkImageView textureImage);
 
 	// Loader Functions
 	stbi_uc* loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize); // Return a unsigned char byte array
