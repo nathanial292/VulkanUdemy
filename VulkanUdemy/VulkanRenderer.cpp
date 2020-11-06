@@ -156,7 +156,7 @@ void VulkanRenderer::cleanupSwapChain() {
 	vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory, nullptr);
 
 	for (auto image : swapChainImages) {
-		vkDestroyImage(mainDevice.logicalDevice, image.image, nullptr);
+		//vkDestroyImage(mainDevice.logicalDevice, image.image, nullptr);
 		vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
 	}
 	swapChainImages.clear();
@@ -1516,8 +1516,11 @@ int VulkanRenderer::createTexture(std::string fileName)
 	// Transition image to be DST for copy operation
 	transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, texImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
-	// Copy data to image
+	// Copy data to image (Staging buffer to texImage)
 	copyImageBuffer(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, imageStagingBuffer, texImage, width, height);
+
+	// Transition image to be shader readable for shader usage
+	transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	// Add texture data to vector for reference
 	textureImages.push_back(texImage);
