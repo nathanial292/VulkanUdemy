@@ -116,9 +116,15 @@ private:
 	std::vector<VkBuffer> modelDUniformBuffer;
 	std::vector<VkDeviceMemory> modelDUniformBufferMemory;
 
+	// Texture boolean for each mesh
+	std::vector<VkBuffer> textureBoolUniformBuffer;
+	std::vector<VkDeviceMemory> textureBoolUniformBufferMemory;
+
 	VkDeviceSize minUniformBufferOffset;
 	size_t modelUniformAlignment;
 	Model* modelTransferSpace;
+	size_t textureBoolUniformAlignment;
+	bool* textureBoolTransferSpace;
 
 	// Synchronisation
 	std::vector<VkSemaphore> imageAvailable;

@@ -41,10 +41,10 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 
 		// Create a mesh
 		std::vector<Vertex> meshVertices = {
-			{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0
-			{ { -0.4, -0.4, 0.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} }, // 1
-			{ { 0.4, -0.4, 0.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f} }, // 2
-			{ { 0.4, 0.4, 0.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} }, // 3
+			{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f }}, // 0
+			{ { -0.4, -0.4, 0.0 },{ 0.0f, 1.0f, 0.0f }}, // 1
+			{ { 0.4, -0.4, 0.0 },{ 0.0f, 0.0f, 1.0f } }, // 2
+			{ { 0.4, 0.4, 0.0 },{ 1.0f, 1.0f, 0.0f } }, // 3
 		};
 
 		std::vector<Vertex> meshVertices2 = {
@@ -60,7 +60,7 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 			2, 3, 0
 		};
 
-		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices, createTexture("download.jpg"));
+		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices);
 		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices2, createTexture("marble.jpg"));
 
 		meshList.push_back(firstMesh);
@@ -434,9 +434,11 @@ void VulkanRenderer::allocateDynamicBufferTransferSpace()
 {
 	// Calculate alignment of model data
 	modelUniformAlignment = (sizeof(Model) + minUniformBufferOffset - 1) & ~(minUniformBufferOffset - 1);
-
 	// Create space in memory to hold dynamic buffer that is aligned to required alignment and holds MAX_OBJECTS
 	modelTransferSpace = (Model*)_aligned_malloc(modelUniformAlignment * MAX_OBJECTS, modelUniformAlignment);
+
+	textureBoolUniformAlignment = (sizeof(bool) + minUniformBufferOffset - 1) & ~(minUniformBufferOffset - 1);
+	textureBoolTransferSpace = (bool*)_aligned_malloc(textureBoolUniformAlignment * MAX_OBJECTS, textureBoolUniformAlignment);
 }
 
 bool VulkanRenderer::checkInstanceExtensionSupport(std::vector<const char*>* checkExtensions)
@@ -1197,7 +1199,15 @@ void VulkanRenderer::createDescriptorSetLayout()
 	modelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 	modelLayoutBinding.pImmutableSamplers = nullptr;
 
-	std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { vpLayoutBinding, modelLayoutBinding };
+	VkDescriptorSetLayoutBinding shouldUseTextureBinding = {};
+	shouldUseTextureBinding.binding = 2;
+	shouldUseTextureBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	shouldUseTextureBinding.descriptorCount = 1;
+	shouldUseTextureBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shouldUseTextureBinding.pImmutableSamplers = nullptr;
+
+
+	std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { vpLayoutBinding, modelLayoutBinding, shouldUseTextureBinding };
 
 	// Create Descriptor Set Layout with given bindings
 	VkDescriptorSetLayoutCreateInfo createInfo = {};
@@ -1244,12 +1254,15 @@ void VulkanRenderer::createUniformBuffers()
 	// View projection buffer size
 	VkDeviceSize vpBufferSize = sizeof(UboViewProjection);
 	VkDeviceSize modelBufferSize = modelUniformAlignment * MAX_OBJECTS;
+	VkDeviceSize textureBoolBufferSize = textureBoolUniformAlignment * MAX_OBJECTS;
 
 	// One uniform buffer for each image (and by extention, command buffer)
 	vpUniformBuffer.resize(swapChainImages.size());
 	vpUniformBufferMemory.resize(swapChainImages.size());
 	modelDUniformBuffer.resize(swapChainImages.size());
 	modelDUniformBufferMemory.resize(swapChainImages.size());
+	textureBoolUniformBuffer.resize(swapChainImages.size());
+	textureBoolUniformBufferMemory.resize(swapChainImages.size());
 
 	// Create the uniform buffers
 	for (size_t i = 0; i < swapChainImages.size(); i++) {
@@ -1258,6 +1271,9 @@ void VulkanRenderer::createUniformBuffers()
 
 		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, modelBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &modelDUniformBuffer[i], &modelDUniformBufferMemory[i]);
+
+		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, textureBoolUniformAlignment, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &textureBoolUniformBuffer[i], &textureBoolUniformBufferMemory[i]);
 	}
 }
 
@@ -1358,7 +1374,22 @@ void VulkanRenderer::createDescriptorSets()
 		modelSetWrite.descriptorCount = 1;
 		modelSetWrite.pBufferInfo = &modelBufferBindingInfo;
 
-		std::vector<VkWriteDescriptorSet> setWrites = { vpSetWrite, modelSetWrite };
+		// TEXTURE BOOLEAN (Used to tell mesh to use texture or not)
+		VkDescriptorBufferInfo textureBufferInfo = {};
+		textureBufferInfo.buffer = textureBoolUniformBuffer[i];
+		textureBufferInfo.offset = 0;
+		textureBufferInfo.range = textureBoolUniformAlignment;
+
+		VkWriteDescriptorSet textureSetWrite = {};
+		textureSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		textureSetWrite.dstSet = descriptorSets[i]; // Descriptor set to update
+		textureSetWrite.dstBinding = 2; // Binding to update (matches with binding on layout/shader)
+		textureSetWrite.dstArrayElement = 0; // Index in array to update
+		textureSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		textureSetWrite.descriptorCount = 1;
+		textureSetWrite.pBufferInfo = &textureBufferInfo; // Information about buffer data to bind
+
+		std::vector<VkWriteDescriptorSet> setWrites = { vpSetWrite, modelSetWrite, textureSetWrite };
 
 		// Update the descriptor sets with new buffer binding info
 		vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(setWrites.size()), setWrites.data(), 0, nullptr);
@@ -1407,6 +1438,16 @@ void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
 	vkMapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex], 0, modelUniformAlignment * meshList.size(), 0, &data);
 	memcpy(data, modelTransferSpace, modelUniformAlignment * meshList.size());
 	vkUnmapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex]);
+
+	// Copy Texture bool data
+	for (size_t i = 0; i < meshList.size(); i++) {
+		bool* thisTextureBool = (bool*)((uint64_t)textureBoolTransferSpace + (i * textureBoolUniformAlignment));
+		*thisTextureBool = meshList[i].getHasTexture();
+	}
+	// Copy texture bool data
+	vkMapMemory(mainDevice.logicalDevice, textureBoolUniformBufferMemory[imageIndex], 0, textureBoolUniformAlignment * meshList.size(), 0, &data);
+	memcpy(data, textureBoolTransferSpace, textureBoolUniformAlignment * meshList.size());
+	vkUnmapMemory(mainDevice.logicalDevice, textureBoolUniformBufferMemory[imageIndex]);
 }
 
 void VulkanRenderer::recordCommands(uint32_t currentImage)
@@ -1448,13 +1489,13 @@ void VulkanRenderer::recordCommands(uint32_t currentImage)
 		vkCmdBindIndexBuffer(commandBuffers[currentImage], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
 
 		// Dynamic offset amount
-		uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+		uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment)+ static_cast<uint32_t>(textureBoolUniformAlignment) * j;
 
 		std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
 
 		// Bind descriptor sets
 		vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+			0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 2, &dynamicOffset);
 
 		vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &meshList[j].getModel());
 

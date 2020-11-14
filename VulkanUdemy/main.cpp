@@ -20,7 +20,7 @@ public:
 	}
 
 
-	void initWindow(std::string wName = "Test Window", const int width = 800, const int height = 600)
+	void initWindow(std::string wName = "Test Window", const int width = 1366, const int height = 768)
 	{
 		// Initialse GLFW
 		glfwInit();

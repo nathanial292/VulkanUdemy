@@ -20,7 +20,11 @@ public:
 		std::vector<uint32_t> * indices, 
 		std::vector<Vertex> * vertices,
 		int newTexId);
+
+	Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<uint32_t>* indices, std::vector<Vertex>* vertices);
 	
+	bool getHasTexture();
+
 	int getTexId();
 
 	int getVertexCount();
@@ -38,6 +42,8 @@ public:
 private:
 	Model model;
 	int texId;
+
+	bool hasTexture;
 
 	int vertexCount;
 	VkBuffer vertexBuffer;

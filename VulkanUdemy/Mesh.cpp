@@ -21,6 +21,24 @@ Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue trans
 
 	model.model = glm::mat4(1.0f);
 	texId = newTexId;
+	hasTexture = true;
+}
+
+Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<uint32_t>* indices, std::vector<Vertex>* vertices)
+{
+	indexCount = indices->size();
+	vertexCount = vertices->size();
+	physicalDevice = newPhysicalDevice;
+	device = newDevice;
+	createVertexBuffer(transferQueue, transferCommandPool, vertices);
+	createIndexBuffer(transferQueue, transferCommandPool, indices);
+
+	model.model = glm::mat4(1.0f);
+	hasTexture = false;
+}
+
+bool Mesh::getHasTexture() {
+	return hasTexture;
 }
 
 int Mesh::getTexId()
