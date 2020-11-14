@@ -17,6 +17,7 @@ layout(push_constant) uniform PushModel {
 // Not in use, left for dynamic buffers
 layout(set = 0, binding = 1) uniform UboModel {
 	mat4 model;
+	bool hasTexture;
 } uboModel;
 
 layout(location = 0) out vec3 fragCol;

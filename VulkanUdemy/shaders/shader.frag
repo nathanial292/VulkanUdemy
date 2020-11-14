@@ -7,6 +7,13 @@ layout(set = 1, binding = 0) uniform sampler2D textureSampler;
 
 layout(location = 0) out vec4 outColour; 	// Final output colour (must also have location
 
+// Dynamic buffers
+layout(set = 0, binding = 1) uniform UboModel {
+	mat4 model;
+	bool hasTexture;
+} uboModel;
+
 void main() {
-	outColour = texture(textureSampler, fragTex);
+if (uboModel.hasTexture)	outColour = texture(textureSampler, fragTex);
+else outColour = outColour = vec4(fragCol, 1.0);
 }

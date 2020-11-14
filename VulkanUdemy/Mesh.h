@@ -7,6 +7,7 @@
 
 struct Model {
 	glm::mat4 model;
+	bool hasTexture;
 };
 
 class Mesh
@@ -20,6 +21,13 @@ public:
 		std::vector<uint32_t> * indices, 
 		std::vector<Vertex> * vertices,
 		int newTexId);
+
+	Mesh(VkPhysicalDevice newPhysicalDevice,
+		VkDevice newDevice,
+		VkQueue transferQueue,
+		VkCommandPool transferCommandPool,
+		std::vector<uint32_t>* indices,
+		std::vector<Vertex>* vertices);
 	
 	int getTexId();
 

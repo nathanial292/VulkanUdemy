@@ -60,7 +60,7 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 			2, 3, 0
 		};
 
-		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices, createTexture("download.jpg"));
+		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices);
 		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices2, createTexture("marble.jpg"));
 
 		meshList.push_back(firstMesh);
@@ -1194,7 +1194,7 @@ void VulkanRenderer::createDescriptorSetLayout()
 	modelLayoutBinding.binding = 1;
 	modelLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 	modelLayoutBinding.descriptorCount = 1;
-	modelLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+	modelLayoutBinding.stageFlags = VK_SHADER_STAGE_ALL;
 	modelLayoutBinding.pImmutableSamplers = nullptr;
 
 	std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { vpLayoutBinding, modelLayoutBinding };
