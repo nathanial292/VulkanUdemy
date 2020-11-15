@@ -14,6 +14,6 @@ layout(set = 0, binding = 1) uniform UboModel {
 } uboModel;
 
 void main() {
-if (uboModel.hasTexture)	outColour = texture(textureSampler, fragTex);
+if (uboModel.hasTexture) outColour = texture(textureSampler, fragTex);
 else outColour = outColour = vec4(fragCol, 1.0);
 }

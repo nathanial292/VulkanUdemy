@@ -4,6 +4,11 @@
 #include <GLFW/glfw3.h>
 #include "Utilities.h"
 #include "Mesh.h"
+#include "MeshModel.h"
+
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 #include "stb_image.h"
 
@@ -78,6 +83,9 @@ private:
 	std::vector<VkImage> textureImages;
 	std::vector<VkDeviceMemory> textureImageMemory;
 	std::vector<VkImageView> textureImageViews;
+
+	// Assets
+	std::vector<MeshModel> modelList;
 
 	// Pipeline
 	VkPipelineLayout pipelineLayout;
@@ -184,6 +192,9 @@ private:
 	int createTextureImage(std::string fileName);
 	int createTexture(std::string fileName);
 	int createTextureDescriptor(VkImageView textureImage);
+
+	// Model creation
+	void createMeshModel(std::string modelFile);
 
 	// Loader Functions
 	stbi_uc* loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize); // Return a unsigned char byte array

@@ -60,8 +60,8 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 			2, 3, 0
 		};
 
-		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices);
-		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices2, createTexture("marble.jpg"));
+		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices, createTexture("marble.jpg"));
+		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices2);
 
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);
@@ -110,6 +110,10 @@ void VulkanRenderer::cleanup()
 	vkDestroyDescriptorPool(mainDevice.logicalDevice, samplerDescriptorPool, nullptr);
 	vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, samplerSetLayout, nullptr);
 	vkDestroySampler(mainDevice.logicalDevice, textureSampler, nullptr);
+
+	for (size_t i = 0; i < modelList.size(); i++) {
+		modelList[i].destroyMeshModel();
+	}
 
 	// C style memory free for dynamic descriptor sets
 	_aligned_free(modelTransferSpace);
@@ -1664,6 +1668,40 @@ int VulkanRenderer::createTextureDescriptor(VkImageView textureImage)
 	samplerDescriptorSets.push_back(descriptorSet);
 
 	return samplerDescriptorSets.size() - 1;
+}
+
+void VulkanRenderer::createMeshModel(std::string modelFile)
+{
+	// Import model "scene"
+	Assimp::Importer importer;
+	const aiScene *scene = importer.ReadFile(modelFile, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
+	if (!scene) {
+		throw std::runtime_error("Failed to load model ("+modelFile+")");
+	}
+
+	// Get vector of all materials with 1:1 ID placment
+	std::vector<std::string> textureNames = MeshModel::LoadMaterials(scene);
+
+	// Conversion from materials list IDs to our descriptor array IDs
+	std::vector<int> matToTex(textureNames.size());
+
+	for (size_t i = 0; i < textureNames.size(); i++) {
+		// If material has no texture, set 0 to indicate no texture. texture 0 will be reserved for default texture
+		if (textureNames[i].empty()) {
+			matToTex[i] = 0;
+		}
+		else {
+			// Otherwise create texture and set value to index of new texture inside sampler
+			matToTex[i] = createTexture(textureNames[i]);
+		}
+	}
+
+	// Load in meshes
+	std::vector<Mesh> modelMeshes = MeshModel::LoadNode(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, scene->mRootNode, scene, matToTex);
+
+	// Create MeshModel and add to list
+	MeshModel meshModel = MeshModel(modelMeshes);
+	modelList.push_back(meshModel);
 }
 
 stbi_uc* VulkanRenderer::loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize)
