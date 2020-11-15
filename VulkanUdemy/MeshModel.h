@@ -2,7 +2,7 @@
 #include "Mesh.h"
 #include <vector>
 
-#include <assimp/scene.h>1
+#include <assimp/scene.h>
 
 #pragma once
 class MeshModel {

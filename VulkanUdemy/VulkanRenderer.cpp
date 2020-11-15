@@ -66,6 +66,8 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);
 
+		//createMeshModel("models/bugatti.obj");
+
 		for (size_t i = 0; i <= MAX_FRAME_DRAWS; ++i) {
 			updateUniformBuffers(i);
 		}

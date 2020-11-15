@@ -104,7 +104,9 @@ Mesh MeshModel::LoadMesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice,
 	}
 
 	// Create new mesh with details and return
-	return Mesh(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, &indices, &vertices, matToTex[mesh->mMaterialIndex]);
+	Mesh newMesh = Mesh(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, &indices, &vertices, matToTex[mesh->mMaterialIndex]);
+
+	return newMesh;
 }
 
 void MeshModel::destroyMeshModel()
