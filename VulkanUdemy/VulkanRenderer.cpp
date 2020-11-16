@@ -8,6 +8,27 @@ VulkanRenderer::VulkanRenderer()
 VulkanRenderer::~VulkanRenderer()
 {
 }
+void VulkanRenderer::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
+
+}
+
+void VulkanRenderer::processInput(GLFWwindow* window) {
+	const float cameraSpeed = 0.05f; // adjust accordingly
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		cameraPos += cameraSpeed * cameraFront;
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		cameraPos -= cameraSpeed * cameraFront;
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+	//https://learnopengl.com/Getting-started/Camera
+	glm::vec3 direction;
+	float yaw = -90.0f;
+	//direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	//direction.y = sin(glm::radians(pitch));
+	//direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+}
 
 int VulkanRenderer::init(GLFWwindow* newWindow)
 {
@@ -35,10 +56,9 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		createSynchronisation();
 
 		uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
-		uboViewProjection.view = glm::lookAt(glm::vec3(0.1f, 0.2f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
 		uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
 
+		
 		// Create a mesh
 		std::vector<Vertex> meshVertices = {
 			{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0
@@ -60,14 +80,13 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 			2, 3, 0
 		};
 
-		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices, createTexture("marble.jpg"));
+		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices, createTexture("wood.png"));
 		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices2);
 
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);
-
-		//createMeshModel("models/bugatti.obj");
-
+		
+		createMeshModel("models/chair_01.obj");
 		for (size_t i = 0; i <= MAX_FRAME_DRAWS; ++i) {
 			updateUniformBuffers(i);
 		}
@@ -175,8 +194,8 @@ void VulkanRenderer::cleanupSwapChain() {
 
 void VulkanRenderer::updateModel(int modelId, glm::mat4 newModel)
 {
-	if (modelId >= meshList.size()) return;
-	meshList[modelId].setModel(newModel);
+	if (modelId >= modelList.size()) return;
+	modelList[modelId].setModel(newModel);
 }
 
 void VulkanRenderer::draw()
@@ -198,9 +217,9 @@ void VulkanRenderer::draw()
 		throw std::runtime_error("Failed to acquire swap chain image");
 	}
 
-
+	uboViewProjection.view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
 	recordCommands(imageIndex); // Rerecord commands every draw
-	//updateUniformBuffers(imageIndex);
+	updateUniformBuffers(imageIndex);
 
 	// SUBMIT COMMAND BUFFER FOR EXECUTION
 	VkSubmitInfo submitInfo = {};
@@ -1446,26 +1465,30 @@ void VulkanRenderer::recordCommands(uint32_t currentImage)
 	// Bind Pipeline to be used in renderpass
 	vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-	for (size_t j = 0; j < meshList.size(); j++) {
-		// Bind our vertex buffer
-		VkBuffer vertexBuffers[] = { meshList[j].getVertexBuffer() }; // Buffers to bind
-		VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
-		vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
-		vkCmdBindIndexBuffer(commandBuffers[currentImage], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
+	for (size_t j = 0; j < modelList.size(); j++) {
+		MeshModel thisModel = modelList[j];
+		glm::mat4 model = thisModel.getModel();
+		vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &model);
 
-		// Dynamic offset amount
-		uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+		for (size_t k = 0; k < thisModel.getMeshCount(); k++) {
+			// Bind our vertex buffer
+			VkBuffer vertexBuffers[] = { thisModel.getMesh(k)->getVertexBuffer() }; // Buffers to bind
+			VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+			vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
+			vkCmdBindIndexBuffer(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
 
-		std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
+			// Dynamic offset amount
+			uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
 
-		// Bind descriptor sets
-		vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-			0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+			std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[thisModel.getMesh(k)->getTexId()] };
 
-		vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &meshList[j].getModel());
+			// Bind descriptor sets
+			vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+				0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
 
-		// Execute our pipeline
-		vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
+			// Execute our pipeline
+			vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
+		}
 	}
 
 	vkCmdEndRenderPass(commandBuffers[currentImage]);

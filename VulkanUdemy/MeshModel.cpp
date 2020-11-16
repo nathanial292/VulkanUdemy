@@ -6,6 +6,10 @@ MeshModel::MeshModel(std::vector<Mesh> newMeshList)
 	model = glm::mat4(1.0f);
 }
 
+MeshModel::~MeshModel()
+{
+}
+
 size_t MeshModel::getMeshCount()
 {
 	return meshList.size();
@@ -25,7 +29,7 @@ glm::mat4 MeshModel::getModel()
 	return model;
 }
 
-void MeshModel::setModle(glm::mat4 newModel)
+void MeshModel::setModel(glm::mat4 newModel)
 {
 	model = newModel;
 }

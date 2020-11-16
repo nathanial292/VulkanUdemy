@@ -8,7 +8,7 @@
 #include <GLFW/glfw3.h>
 
 const int MAX_FRAME_DRAWS = 2;
-const int MAX_OBJECTS = 10;
+const int MAX_OBJECTS = 20;
 
 const std::vector<const char*> deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -48,7 +48,7 @@ const std::vector<const char*> validationLayers = {
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
-const bool enableValidationLayers = true;
+const bool enableValidationLayers = false;
 #endif
 
 // Callback function for validation debugging (will be called when validation information record)

@@ -32,6 +32,7 @@ public:
 		window = glfwCreateWindow(width, height, wName.c_str(), nullptr, nullptr);
 		glfwSetWindowUserPointer(window, this);
 		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	}
 
 	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
@@ -59,6 +60,8 @@ public:
 		while (!glfwWindowShouldClose(window))
 		{
 			glfwPollEvents();
+			vulkanRenderer.processInput(window);
+			//glfwSetCursorPosCallback(window, vulkanRenderer.mouse_callback);
 
 			float now = glfwGetTime();
 			deltaTime = now - lastTime;
@@ -67,17 +70,12 @@ public:
 			angle += 10.0f * deltaTime;
 			if (angle > 360.0f) angle = 0.0f;
 
+			
 			glm::mat4 firstModel(1.0f);
-			glm::mat4 secondModel(1.0f);
-
-			firstModel = glm::translate(firstModel, glm::vec3(-0.3f, 0.0f, 0.7f));
-			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, 0.0f, -1.0f));
-
-			secondModel = glm::translate(secondModel, glm::vec3(0.7f, 0.0f, -2.0f));
-			secondModel = glm::rotate(secondModel, glm::radians(-angle * 10), glm::vec3(0.0f, 0.0f, -1.0f));
+			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
 
 			vulkanRenderer.updateModel(0, firstModel);
-			vulkanRenderer.updateModel(1, secondModel);
+			
 
 			vulkanRenderer.draw();
 		}
