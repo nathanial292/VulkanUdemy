@@ -30,6 +30,7 @@ public:
 	int init(GLFWwindow* newWindow);
 
 	void updateModel(int modelId, glm::mat4 newModel);
+	void updateModelMesh(int modelId, glm::mat4 newModel);
 
 	void draw();
 	void cleanup();
@@ -40,10 +41,16 @@ public:
 	}
 
 	// Camera fucntions
+	bool firstMouse = true;
 	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
 	glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
 	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	float lastX = 400;
+	float lastY = 300;
+	float yaw = -90.0f;
+	float pitch = -10.0f;
 	void processInput(GLFWwindow* window);
+	void processMouse(GLFWwindow* window);
 	void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 	~VulkanRenderer();
 
@@ -200,7 +207,7 @@ private:
 	int createTextureDescriptor(VkImageView textureImage);
 
 	// Model creation
-	void createMeshModel(std::string modelFile);
+	void createMeshModel(std::string modelFile, int texId);
 
 	// Loader Functions
 	stbi_uc* loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize); // Return a unsigned char byte array

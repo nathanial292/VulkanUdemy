@@ -20,7 +20,7 @@ public:
 	}
 
 
-	void initWindow(std::string wName = "Test Window", const int width = 800, const int height = 600)
+	void initWindow(std::string wName = "Cloud Gaming Environment", const int width = 800, const int height = 600)
 	{
 		// Initialse GLFW
 		glfwInit();
@@ -44,7 +44,7 @@ public:
 	int gameLoop()
 	{
 		// Create window
-		initWindow("Test Window", 800, 600);
+		initWindow("Cloud Gaming Environment", 800, 600);
 
 		// Create VulkanRenderer Instance
 		if (vulkanRenderer.init(window) == EXIT_FAILURE)
@@ -61,7 +61,7 @@ public:
 		{
 			glfwPollEvents();
 			vulkanRenderer.processInput(window);
-			//glfwSetCursorPosCallback(window, vulkanRenderer.mouse_callback);
+			vulkanRenderer.processMouse(window);
 
 			float now = glfwGetTime();
 			deltaTime = now - lastTime;
@@ -74,8 +74,8 @@ public:
 			glm::mat4 firstModel(1.0f);
 			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
 
+			//vulkanRenderer.updateModelMesh(0, firstModel);
 			vulkanRenderer.updateModel(0, firstModel);
-			
 
 			vulkanRenderer.draw();
 		}

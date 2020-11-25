@@ -13,7 +13,7 @@ void VulkanRenderer::mouse_callback(GLFWwindow* window, double xpos, double ypos
 }
 
 void VulkanRenderer::processInput(GLFWwindow* window) {
-	const float cameraSpeed = 0.05f; // adjust accordingly
+	const float cameraSpeed = 0.01f; // adjust accordingly
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 		cameraPos += cameraSpeed * cameraFront;
 	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
@@ -22,12 +22,39 @@ void VulkanRenderer::processInput(GLFWwindow* window) {
 		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+}
+
+void VulkanRenderer::processMouse(GLFWwindow* window) {
 	//https://learnopengl.com/Getting-started/Camera
+	double xpos, ypos;
+	glfwGetCursorPos(window, &xpos, &ypos); // Get the current cursor values, store in xpos and ypos
+
+	if (firstMouse) {
+		lastX = xpos;
+		lastY = ypos;
+		firstMouse = false;
+	}
+
+	float xOffset = xpos - lastX;
+	float yOffset = lastY - ypos;
+	lastX = xpos;
+	lastY = ypos;
+
+	const float sensitivity = 0.01f;
+	xOffset *= sensitivity;
+	yOffset *= sensitivity;
+	
+	yaw += xOffset;
+	pitch += yOffset;
+	if (pitch > 89.0f)
+		pitch = 89.0f;
+	if (pitch < -89.0f)
+		pitch = -89.0f;
 	glm::vec3 direction;
-	float yaw = -90.0f;
-	//direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-	//direction.y = sin(glm::radians(pitch));
-	//direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+	direction.y = sin(glm::radians(pitch));
+	direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+	cameraFront = glm::normalize(direction);
 }
 
 int VulkanRenderer::init(GLFWwindow* newWindow)
@@ -58,35 +85,37 @@ int VulkanRenderer::init(GLFWwindow* newWindow)
 		uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
 		uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
 
-		
 		// Create a mesh
 		std::vector<Vertex> meshVertices = {
-			{ { -0.4, 0.4, 0.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0
-			{ { -0.4, -0.4, 0.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} }, // 1
-			{ { 0.4, -0.4, 0.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f} }, // 2
-			{ { 0.4, 0.4, 0.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} }, // 3
+			{ { -2, 2, -2.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0
+			{ { -2, -0.1, -2.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} }, // 1
+			{ { 2, -0.1, -2.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f} }, // 2
+			{ { 2, 2, -2.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} }, // 3
 		};
-
-		std::vector<Vertex> meshVertices2 = {
-			{ { -0.25, 0.6, 0.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0
-			{ { -0.25, -0.6, 0.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} }, // 1
-			{ { 0.25, -0.6, 0.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f}}, // 2
-			{ { 0.25, 0.6, 0.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} }, // 3
-		};
-
-		// Index data
 		std::vector<uint32_t> meshIndicies = {
 			0, 1, 2,
 			2, 3, 0
 		};
 
-		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices, createTexture("wood.png"));
-		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices2);
+		std::vector<Vertex> meshVertices2 = {
+			{ { 2, -0.1, 2.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0 // Close right
+			{ { 2, -0.1, -2.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} }, // 1 Back right
+			{ { -2, -0.1, 2.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f}}, // 2 // Close left
+			{ { -2, -0.1, -2.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} }, // 3 Back left
+		};
+		// Index data
+		std::vector<uint32_t> meshIndicies2 = {
+			0, 1, 3,
+			0, 3, 2
+		};
+
+		Mesh firstMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies, &meshVertices, createTexture("marble.jpg"));
+		Mesh secondMesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &meshIndicies2, &meshVertices2, createTexture("marble.jpg"));
 
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);
 		
-		createMeshModel("models/chair_01.obj");
+		createMeshModel("models/chair_01.obj", createTexture("wood.png"));
 		for (size_t i = 0; i <= MAX_FRAME_DRAWS; ++i) {
 			updateUniformBuffers(i);
 		}
@@ -196,6 +225,11 @@ void VulkanRenderer::updateModel(int modelId, glm::mat4 newModel)
 {
 	if (modelId >= modelList.size()) return;
 	modelList[modelId].setModel(newModel);
+}
+
+void VulkanRenderer::updateModelMesh(int modelId, glm::mat4 newModel) {
+	if (modelId >= meshList.size()) return;
+	meshList[modelId].setModel(newModel);
 }
 
 void VulkanRenderer::draw()
@@ -1489,6 +1523,30 @@ void VulkanRenderer::recordCommands(uint32_t currentImage)
 			// Execute our pipeline
 			vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
 		}
+
+		for (size_t j = 0; j < meshList.size(); j++) {
+			Mesh thisMesh = meshList[j];
+			Model thisModel = thisMesh.getModel();
+			// Bind our vertex buffer
+			VkBuffer vertexBuffers[] = { meshList[j].getVertexBuffer() }; // Buffers to bind
+			VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+			vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
+			vkCmdBindIndexBuffer(commandBuffers[currentImage], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
+
+			// Dynamic offset amount
+			uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+
+			std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
+
+			// Bind descriptor sets
+			vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+				0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+
+			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &thisModel.model);
+
+			// Execute our pipeline
+			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
+		}
 	}
 
 	vkCmdEndRenderPass(commandBuffers[currentImage]);
@@ -1695,7 +1753,7 @@ int VulkanRenderer::createTextureDescriptor(VkImageView textureImage)
 	return samplerDescriptorSets.size() - 1;
 }
 
-void VulkanRenderer::createMeshModel(std::string modelFile)
+void VulkanRenderer::createMeshModel(std::string modelFile, int texId)
 {
 	// Import model "scene"
 	Assimp::Importer importer;
@@ -1712,10 +1770,13 @@ void VulkanRenderer::createMeshModel(std::string modelFile)
 
 	for (size_t i = 0; i < textureNames.size(); i++) {
 		// If material has no texture, set 0 to indicate no texture. texture 0 will be reserved for default texture
-		if (textureNames[i].empty()) {
-			matToTex[i] = 0;
+		if (textureNames[i].empty() && texId != NULL) {
+			matToTex[i] = texId;
 		}
-		else {
+		else if (textureNames[i].empty()) {
+			matToTex[i] = 0; // Choose first texture ever loaded in
+		}
+		else { // Otherwise if texture does exist, use that
 			// Otherwise create texture and set value to index of new texture inside sampler
 			matToTex[i] = createTexture(textureNames[i]);
 		}
