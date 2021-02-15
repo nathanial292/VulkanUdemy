@@ -29,6 +29,13 @@ public:
 	}
 	bool getFrameBufferResized() { return frameBufferResized; }
 
+	GLFWwindow* getWindow() { return mainWindow; }
+
+	void cleanUp() {
+		glfwDestroyWindow(mainWindow);
+		glfwTerminate();
+	}
+
 	~Window();
 
 private:

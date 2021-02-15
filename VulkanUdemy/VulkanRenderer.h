@@ -6,6 +6,7 @@
 #include "Mesh.h"
 #include "MeshModel.h"
 #include "Window.h"
+#include "Camera.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -28,7 +29,7 @@ class VulkanRenderer
 public:
 	VulkanRenderer();
 
-	int init(GLFWwindow* newWindow, Window* window);
+	int init(Window* window, Camera* camera);
 
 	void updateModel(int modelId, glm::mat4 newModel);
 	void updateModelMesh(int modelId, glm::mat4 newModel);
@@ -37,26 +38,11 @@ public:
 	void cleanup();
 	void cleanupSwapChain();
 
-	void setFrameBufferResize(bool flag) {
-		frameBufferResized = flag;
-	}
-
-	// Camera fucntions
-	bool firstMouse = true;
-	glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 3.0f);
-	glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
-	float lastX = 400;
-	float lastY = 300;
-	float yaw = -90.0f;
-	float pitch = -10.0f;
-	void processInput(GLFWwindow* window);
-	void processMouse(GLFWwindow* window);
-	void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 	~VulkanRenderer();
 
 private:
-	GLFWwindow* window;
+	Window* window;
+	Camera* camera;
 
 	int currentFrame = 0;
 	bool frameBufferResized = false;

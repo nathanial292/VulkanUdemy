@@ -21,44 +21,19 @@ public:
 		return vulkanRenderer;
 	}
 
-
-	void initWindow(std::string wName = "Cloud Gaming Environment", const int width = 800, const int height = 600)
-	{
-		// Initialse GLFW
-		glfwInit();
-
-		// Set GLFW to not work with opengl
-		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-
-		window = glfwCreateWindow(width, height, wName.c_str(), nullptr, nullptr);
-		glfwSetWindowUserPointer(window, this);
-		glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-	}
-
-	static void framebufferResizeCallback(GLFWwindow* window, int width, int height) {
-		auto app = reinterpret_cast<Main*>(glfwGetWindowUserPointer(window));
-		VulkanRenderer renderer = app->getVulkanRenderer();
-		renderer.setFrameBufferResize(true);
-	}
-
 	int gameLoop()
 	{
-		// Create window
-		initWindow("Cloud Gaming Environment", 800, 600);
-		
 		// Create Camera
 		// Start Pos (x,y,z)
 		// Start Up (x,y,z)
 		// GLfloat startYaw, GLfloat startPitch, GLfloat startMoveSpeed, GLfloat startTurnSpeed
-		camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, -10.0f, 5.0f, 0.05f);
-
+		camera = new Camera(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, -10.0f, 5.0f, 0.05f);
+#		// Create window
 		theWindow = new Window();
 		theWindow->Initialise();
 
 		// Create VulkanRenderer Instance
-		if (vulkanRenderer.init(window, theWindow) == EXIT_FAILURE)
+		if (vulkanRenderer.init(theWindow, camera) == EXIT_FAILURE)
 		{
 			return EXIT_FAILURE;
 		}
@@ -68,11 +43,11 @@ public:
 		float lastTime = 0.0f;
 
 		// Loop until closed
-		while (!glfwWindowShouldClose(window))
+		while (!theWindow->getShouldClose())
 		{
 			glfwPollEvents();
-			vulkanRenderer.processInput(window);
-			vulkanRenderer.processMouse(window);
+			camera->keyControl(theWindow->getKeys(), deltaTime);
+			camera->mouseControl(theWindow->getXChange(), theWindow->getYChange());
 
 			float now = glfwGetTime();
 			deltaTime = now - lastTime;
@@ -94,18 +69,14 @@ public:
 		vulkanRenderer.cleanup();
 
 		// Destory GLFW window and stop GLFW
-		glfwDestroyWindow(window);
-		glfwTerminate();
-
-
+		theWindow->cleanUp();
 		return 0;
 	}
 
 private:
-	Camera camera;
+	Camera *camera;
 	Window *theWindow;
 
-	GLFWwindow* window;
 	VulkanRenderer vulkanRenderer;
 };
 

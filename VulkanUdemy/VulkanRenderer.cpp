@@ -8,58 +8,11 @@ VulkanRenderer::VulkanRenderer()
 VulkanRenderer::~VulkanRenderer()
 {
 }
-void VulkanRenderer::mouse_callback(GLFWwindow* window, double xpos, double ypos) {
 
-}
-
-void VulkanRenderer::processInput(GLFWwindow* window) {
-	const float cameraSpeed = 0.01f; // adjust accordingly
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-		cameraPos += cameraSpeed * cameraFront;
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-		cameraPos -= cameraSpeed * cameraFront;
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-		cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-		cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
-}
-
-void VulkanRenderer::processMouse(GLFWwindow* window) {
-	//https://learnopengl.com/Getting-started/Camera
-	double xpos, ypos;
-	glfwGetCursorPos(window, &xpos, &ypos); // Get the current cursor values, store in xpos and ypos
-
-	if (firstMouse) {
-		lastX = xpos;
-		lastY = ypos;
-		firstMouse = false;
-	}
-
-	float xOffset = xpos - lastX;
-	float yOffset = lastY - ypos;
-	lastX = xpos;
-	lastY = ypos;
-
-	const float sensitivity = 0.01f;
-	xOffset *= sensitivity;
-	yOffset *= sensitivity;
-	
-	yaw += xOffset;
-	pitch += yOffset;
-	if (pitch > 89.0f)
-		pitch = 89.0f;
-	if (pitch < -89.0f)
-		pitch = -89.0f;
-	glm::vec3 direction;
-	direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-	direction.y = sin(glm::radians(pitch));
-	direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-	cameraFront = glm::normalize(direction);
-}
-
-int VulkanRenderer::init(GLFWwindow* newWindow, Window* theWindow)
+int VulkanRenderer::init(Window* newWindow, Camera* newCamera)
 {
 	window = newWindow;
+	camera = newCamera;
 	try {
 		createInstance();
 		setupDebugMessenger();
@@ -131,9 +84,9 @@ int VulkanRenderer::init(GLFWwindow* newWindow, Window* theWindow)
 void VulkanRenderer::recreateSwapChain()
 {
 	int width = 0, height = 0;
-	glfwGetFramebufferSize(window, &width, &height);
+	glfwGetFramebufferSize(window->getWindow(), &width, &height);
 	while (width == 0 || height == 0) {
-		glfwGetFramebufferSize(window, &width, &height);
+		glfwGetFramebufferSize(window->getWindow(), &width, &height);
 		glfwWaitEvents();
 	}
 
@@ -251,7 +204,7 @@ void VulkanRenderer::draw()
 		throw std::runtime_error("Failed to acquire swap chain image");
 	}
 
-	uboViewProjection.view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+	uboViewProjection.view = camera->calculateViewMatrix();
 	recordCommands(imageIndex); // Rerecord commands every draw
 	updateUniformBuffers(imageIndex);
 
@@ -411,7 +364,7 @@ void VulkanRenderer::createLogicalDevice()
 void VulkanRenderer::createSurface()
 {
 	// Create the surface (Creating a surface create info struct, specific to GLFW window type) - returns result
-	VkResult result = glfwCreateWindowSurface(instance, window, nullptr, &surface);
+	VkResult result = glfwCreateWindowSurface(instance, window->getWindow(), nullptr, &surface);
 	if (result != VK_SUCCESS) throw std::runtime_error("Failed to create surface");
 
 
@@ -730,7 +683,7 @@ VkExtent2D VulkanRenderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& surf
 	} else {
 		// If value can vary, need to set manually
 		int width, height;
-		glfwGetFramebufferSize(window, &width, &height); // Get width and height from window (glfw)
+		glfwGetFramebufferSize(window->getWindow(), &width, &height); // Get width and height from window (glfw)
 
 		// Create new extent using window size
 		VkExtent2D newExtent = {};
