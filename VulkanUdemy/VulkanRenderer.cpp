@@ -57,7 +57,7 @@ void VulkanRenderer::processMouse(GLFWwindow* window) {
 	cameraFront = glm::normalize(direction);
 }
 
-int VulkanRenderer::init(GLFWwindow* newWindow)
+int VulkanRenderer::init(GLFWwindow* newWindow, Window* theWindow)
 {
 	window = newWindow;
 	try {

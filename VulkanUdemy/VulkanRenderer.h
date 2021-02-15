@@ -1,10 +1,11 @@
 #pragma once
-
 #define GLFW_INCLUDE_VULKAN
+
 #include <GLFW/glfw3.h>
 #include "Utilities.h"
 #include "Mesh.h"
 #include "MeshModel.h"
+#include "Window.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -27,7 +28,7 @@ class VulkanRenderer
 public:
 	VulkanRenderer();
 
-	int init(GLFWwindow* newWindow);
+	int init(GLFWwindow* newWindow, Window* window);
 
 	void updateModel(int modelId, glm::mat4 newModel);
 	void updateModelMesh(int modelId, glm::mat4 newModel);

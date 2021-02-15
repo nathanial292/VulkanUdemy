@@ -8,6 +8,8 @@
 #include <iostream>
 
 #include "VulkanRenderer.h"
+#include "Window.h"
+#include "Camera.h"
 
 class Main {
 public:
@@ -45,9 +47,18 @@ public:
 	{
 		// Create window
 		initWindow("Cloud Gaming Environment", 800, 600);
+		
+		// Create Camera
+		// Start Pos (x,y,z)
+		// Start Up (x,y,z)
+		// GLfloat startYaw, GLfloat startPitch, GLfloat startMoveSpeed, GLfloat startTurnSpeed
+		camera = Camera(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, -10.0f, 5.0f, 0.05f);
+
+		theWindow = new Window();
+		theWindow->Initialise();
 
 		// Create VulkanRenderer Instance
-		if (vulkanRenderer.init(window) == EXIT_FAILURE)
+		if (vulkanRenderer.init(window, theWindow) == EXIT_FAILURE)
 		{
 			return EXIT_FAILURE;
 		}
@@ -70,7 +81,7 @@ public:
 			angle += 10.0f * deltaTime;
 			if (angle > 360.0f) angle = 0.0f;
 
-			
+
 			glm::mat4 firstModel(1.0f);
 			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
 
@@ -91,6 +102,9 @@ public:
 	}
 
 private:
+	Camera camera;
+	Window *theWindow;
+
 	GLFWwindow* window;
 	VulkanRenderer vulkanRenderer;
 };
