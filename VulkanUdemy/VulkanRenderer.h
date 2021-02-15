@@ -6,6 +6,7 @@
 #include "MeshModel.h"
 #include "Window.h"
 #include "Camera.h"
+#include "DirectionalLight.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -82,6 +83,9 @@ public:
 	}
 	void setModelList(std::vector<MeshModel>* theModelList) { 
 		modelList = *theModelList;
+	}
+	void setDirectionalLight(DirectionalLight light) {
+		directionalLight = light;
 	}
 
 	// Allocate Functions
@@ -198,12 +202,16 @@ private:
 	std::vector<VkDeviceMemory> vpUniformBufferMemory;
 	
 	// Dynamic uniform buffers (Changes between each mesh)
+	VkDeviceSize minUniformBufferOffset;
+
 	std::vector<VkBuffer> modelDUniformBuffer;
 	std::vector<VkDeviceMemory> modelDUniformBufferMemory;
-
-	VkDeviceSize minUniformBufferOffset;
 	size_t modelUniformAlignment;
 	Model* modelTransferSpace;
+
+	std::vector<VkBuffer> directionalLightUniformBuffer;
+	std::vector<VkDeviceMemory> directionalLightUniformBufferMemory;
+	DirectionalLight directionalLight;
 
 	// Synchronisation
 	std::vector<VkSemaphore> imageAvailable;

@@ -10,6 +10,7 @@
 #include "VulkanRenderer.h"
 #include "Window.h"
 #include "Camera.h"
+#include "DirectionalLight.h"
 
 class Main {
 public:
@@ -32,6 +33,10 @@ public:
 		theWindow = new Window();
 		theWindow->Initialise();
 
+		light = DirectionalLight(1.0f, 1.0f, 1.0f,
+			0.2f, 0.8f,
+			0.0f, 6.0f, 0.0f);
+
 		// Create VulkanRenderer Instance
 		if (vulkanRenderer.init(theWindow, camera) == EXIT_FAILURE)
 		{
@@ -41,12 +46,9 @@ public:
 		// Populate meshList and modelList with vertices
 		CreateObjects();
 
-		/*
 		light = DirectionalLight(1.0f, 1.0f, 1.0f,
 			0.1f, 0.8f,
 			0.0f, 6.0f, 0.0f);
-		*/
-
 
 		float angle = 0.0f;
 		float deltaTime = 0.0f;
@@ -126,15 +128,17 @@ public:
 
 		vulkanRenderer.setModelList(&modelList);
 		vulkanRenderer.setMeshList(&meshList);
+
+		vulkanRenderer.setDirectionalLight(light);
 	}
 
 
 private:
 	Camera *camera;
 	Window *theWindow;
-	//DirectionalLight light;
 	std::vector<Mesh> meshList;
 	std::vector<MeshModel> modelList;
+	DirectionalLight light;
 
 	VulkanRenderer vulkanRenderer;
 };
