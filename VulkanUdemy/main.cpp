@@ -23,9 +23,6 @@ public:
 
 	int gameLoop()
 	{
-		// Populate meshList and modelList with vertices
-		CreateObjects();
-
 		// Create Camera
 		// Start Pos (x,y,z)
 		// Start Up (x,y,z)
@@ -41,8 +38,11 @@ public:
 			return EXIT_FAILURE;
 		}
 
+		// Populate meshList and modelList with vertices
+		CreateObjects();
+
 		/*
-				light = DirectionalLight(1.0f, 1.0f, 1.0f,
+		light = DirectionalLight(1.0f, 1.0f, 1.0f,
 			0.1f, 0.8f,
 			0.0f, 6.0f, 0.0f);
 		*/
@@ -107,8 +107,12 @@ public:
 			1, 2, 3
 		};
 
-		Mesh firstMesh = Mesh(vulkanRenderer.getVulkanDevice().physicalDevice, vulkanRenderer.getVulkanDevice().logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &floorIndices, &floorVertices, vulkanRenderer.createTexture("marble.jpg"));
-		Mesh secondMesh = Mesh(vulkanRenderer.getVulkanDevice().physicalDevice, vulkanRenderer.getVulkanDevice().logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &meshIndicies2, &meshVertices2, vulkanRenderer.createTexture("marble.jpg"));
+
+		VkPhysicalDevice physicalDevice = vulkanRenderer.getVulkanDevice().physicalDevice;
+		VkDevice logicalDevice = vulkanRenderer.getVulkanDevice().logicalDevice;
+
+		Mesh firstMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &floorIndices, &floorVertices, vulkanRenderer.createTexture("marble.jpg"));
+		Mesh secondMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &meshIndicies2, &meshVertices2, vulkanRenderer.createTexture("marble.jpg"));
 
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);

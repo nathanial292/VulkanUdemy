@@ -78,10 +78,10 @@ public:
 
 	// Set functions
 	void setMeshList(std::vector<Mesh>* theMeshlist) {
-		meshList = theMeshlist;
+		meshList = *theMeshlist;
 	}
 	void setModelList(std::vector<MeshModel>* theModelList) { 
-		modelList = theModelList;
+		modelList = *theModelList;
 	}
 
 	// Allocate Functions
@@ -161,8 +161,8 @@ private:
 	std::vector<VkImageView> textureImageViews;
 
 	// Scene objects
-	std::vector<MeshModel>* modelList;
-	std::vector<Mesh>* meshList;
+	std::vector<MeshModel> modelList;
+	std::vector<Mesh> meshList;
 
 	// Pipeline
 	VkPipelineLayout pipelineLayout;
