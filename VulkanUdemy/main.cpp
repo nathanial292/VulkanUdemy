@@ -56,7 +56,6 @@ public:
 			angle += 10.0f * deltaTime;
 			if (angle > 360.0f) angle = 0.0f;
 
-
 			glm::mat4 firstModel(1.0f);
 			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
 

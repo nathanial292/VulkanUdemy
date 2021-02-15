@@ -39,6 +39,8 @@ int Window::Initialise()
 	glfwSetWindowUserPointer(mainWindow, this);
 	glfwSetFramebufferSizeCallback(mainWindow, framebufferResizeCallback);
 	glfwSetInputMode(mainWindow, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetCursorPosCallback(mainWindow, mouse_callback);
+	glfwSetKeyCallback(mainWindow, key_callback);
 
 	return 0;
 }
