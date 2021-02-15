@@ -23,6 +23,9 @@ public:
 
 	int gameLoop()
 	{
+		// Populate meshList and modelList with vertices
+		CreateObjects();
+
 		// Create Camera
 		// Start Pos (x,y,z)
 		// Start Up (x,y,z)
@@ -37,6 +40,13 @@ public:
 		{
 			return EXIT_FAILURE;
 		}
+
+		/*
+				light = DirectionalLight(1.0f, 1.0f, 1.0f,
+			0.1f, 0.8f,
+			0.0f, 6.0f, 0.0f);
+		*/
+
 
 		float angle = 0.0f;
 		float deltaTime = 0.0f;
@@ -72,9 +82,55 @@ public:
 		return 0;
 	}
 
+	void CreateObjects() {
+		std::vector<Vertex> meshVertices2 = {
+			{ { -2, 2, -2.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0
+			{ { -2, -0.1, -2.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} }, // 1
+			{ { 2, -0.1, -2.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f} }, // 2
+			{ { 2, 2, -2.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} }, // 3
+		};
+		// Index data
+		std::vector<uint32_t> meshIndicies2 = {
+			0, 1, 2,
+			2, 3, 0
+		};
+
+		std::vector<Vertex> floorVertices = {
+			{ { -20.0, 0.0, -20.0}, { 0.0f, 0.0f, 0.0f}, { 1.0f, 1.0f } }, //BL
+			{ { 20.0, 0.0, -20.0}, { 10.0f, 0.0f, 0.0f}, { 1.0f, 0.0f } },//BR
+			{ { -20., 0.0, 20.0 }, { 0.0f, 10.0f, 0.0f }, { 0.0f, 0.0f } },//FL
+			{ { 20.0, 0.0, 20.0 }, { 10.0f, 10.0f, 0.0f }, { 0.0f, 1.0f } }//FR
+		};
+
+		std::vector<uint32_t> floorIndices = {
+			0, 2, 1,
+			1, 2, 3
+		};
+
+		Mesh firstMesh = Mesh(vulkanRenderer.getVulkanDevice().physicalDevice, vulkanRenderer.getVulkanDevice().logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &floorIndices, &floorVertices, vulkanRenderer.createTexture("marble.jpg"));
+		Mesh secondMesh = Mesh(vulkanRenderer.getVulkanDevice().physicalDevice, vulkanRenderer.getVulkanDevice().logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &meshIndicies2, &meshVertices2, vulkanRenderer.createTexture("marble.jpg"));
+
+		meshList.push_back(firstMesh);
+		meshList.push_back(secondMesh);
+
+		MeshModel meshModel = vulkanRenderer.createMeshModel("models/chair_01.obj", vulkanRenderer.createTexture("wood.png"));
+		modelList.push_back(meshModel);
+
+		for (size_t i = 0; i <= MAX_FRAME_DRAWS; ++i) {
+			vulkanRenderer.updateUniformBuffers(i);
+		}
+
+		vulkanRenderer.setModelList(&modelList);
+		vulkanRenderer.setMeshList(&meshList);
+	}
+
+
 private:
 	Camera *camera;
 	Window *theWindow;
+	//DirectionalLight light;
+	std::vector<Mesh> meshList;
+	std::vector<MeshModel> modelList;
 
 	VulkanRenderer vulkanRenderer;
 };
