@@ -95,6 +95,11 @@ void VulkanRenderer::cleanup()
 		vkFreeMemory(mainDevice.logicalDevice, vpUniformBufferMemory[i], nullptr);
 		vkDestroyBuffer(mainDevice.logicalDevice, modelDUniformBuffer[i], nullptr);
 		vkFreeMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[i], nullptr);
+
+		vkDestroyBuffer(mainDevice.logicalDevice, directionalLightUniformBuffer[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[i], nullptr);
+		vkDestroyBuffer(mainDevice.logicalDevice, cameraPositionUniformBuffer[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[i], nullptr);
 	}
 	for (size_t i = 0; i < meshList.size(); i++) {
 		meshList[i].destroyBuffers();
@@ -1242,7 +1247,7 @@ void VulkanRenderer::createUniformBuffers()
 	VkDeviceSize vpBufferSize = sizeof(UboViewProjection);
 	VkDeviceSize modelBufferSize = modelUniformAlignment * MAX_OBJECTS;
 	VkDeviceSize directionalLightBufferSize = sizeof(UniformLight);
-	VkDeviceSize cameraPositionBufferSize = sizeof(CameraPosition);
+	VkDeviceSize cameraPositionBufferSize = sizeof(glm::vec3);
 
 	// One uniform buffer for each image (and by extention, command buffer)
 	vpUniformBuffer.resize(swapChainImages.size());
@@ -1401,7 +1406,7 @@ void VulkanRenderer::createDescriptorSets()
 		VkDescriptorBufferInfo cameraPositionInfo = {};
 		cameraPositionInfo.buffer = cameraPositionUniformBuffer[i]; // Buffer to get data from
 		cameraPositionInfo.offset = 0; // Position where data starts
-		cameraPositionInfo.range = sizeof(CameraPosition); // Size of data 
+		cameraPositionInfo.range = sizeof(glm::vec3); // Size of data 
 
 		// Data about connection between binding and buffer
 		VkWriteDescriptorSet cameraPositionSetWrite = {};
@@ -1472,16 +1477,12 @@ void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
 	memcpy(data, &light, sizeof(UniformLight));
 	vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
 
-	//CameraPosition cameraPosition = (*camera).getCameraPosition();
-
-
-	CameraPosition cameraPosition = {};
-	cameraPosition.cameraPos = glm::vec3(1.0, 1.0, 1.0);
+	glm::vec3 cameraPosition = camera->getCameraPosition();
 	std::cout << "CAMERA POSITION" << "\n";
-	std::cout << cameraPosition.cameraPos.x << " " << cameraPosition.cameraPos.y << " " << cameraPosition.cameraPos.z << "\n";
+	std::cout << cameraPosition.x << " " << cameraPosition.y << " " << cameraPosition.z << "\n";
 
-	vkMapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex], 0, sizeof(CameraPosition), 0, &data);
-	memcpy(data, &cameraPosition, sizeof(CameraPosition));
+	vkMapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex], 0, sizeof(glm::vec3), 0, &data);
+	memcpy(data, &cameraPosition, sizeof(glm::vec3));
 	vkUnmapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex]);
 }
 

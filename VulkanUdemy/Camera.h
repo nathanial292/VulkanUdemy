@@ -3,10 +3,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <GLFW/glfw3.h>
 
-struct CameraPosition {
-	glm::vec3 cameraPos;
-};
-
 class Camera
 {
 public:
@@ -16,7 +12,7 @@ public:
 	void keyControl(bool* keys, GLfloat deltaTime);
 	void mouseControl(GLfloat xChange, GLfloat yChange);
 	glm::mat4 calculateViewMatrix();
-	CameraPosition getCameraPosition();
+	glm::vec3 getCameraPosition();
 
 	~Camera();
 private:

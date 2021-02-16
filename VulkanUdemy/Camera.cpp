@@ -62,13 +62,9 @@ glm::mat4 Camera::calculateViewMatrix()
 	return glm::lookAt(position, position + front, up);
 }
 
-CameraPosition Camera::getCameraPosition()
+glm::vec3 Camera::getCameraPosition()
 {
-	CameraPosition positionStruct = {};
-	positionStruct.cameraPos = position;
-
-	//std::cout << position.x << " " << position.y << " " << position.z << "\n";
-	return positionStruct;
+	return position;
 }
 
 void Camera::update()

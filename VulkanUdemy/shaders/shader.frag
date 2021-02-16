@@ -23,9 +23,7 @@ layout(set = 0, binding = 2) uniform DirectionalLight {
 	float diffuseIntensity;
 } directionalLight;
 
-layout(set = 0, binding = 3) uniform CameraPosition {
-	vec3 cameraPos;
-} cameraPosition;
+layout(set = 0, binding = 3) uniform vec3 cameraPosition;
 
 vec4 CalcDirectionalLight()
 {
