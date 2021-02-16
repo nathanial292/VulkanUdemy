@@ -4,8 +4,8 @@
 struct UniformLight {
     glm::vec3 colour;
     glm::vec3 direction;
-    float diffuseIntensity;
     float ambientIntensity;
+    float diffuseIntensity;
 };
 
 class DirectionalLight :
@@ -19,9 +19,6 @@ public:
         float xDir, float yDir, float zDir);
 
     UniformLight getLight();
-
-    void UseLight(uint32_t ambientIntensityLocation, uint32_t ambientColourLocation,
-        uint32_t diffuseIntensityLocation, uint32_t directionLocation);
 
     void UpdatePosition(float xDir, float yDir, float zDir);
 

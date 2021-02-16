@@ -1428,9 +1428,12 @@ void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
 	vkUnmapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex]);
 
 	UniformLight light = directionalLight.getLight();
+	//std::cout << light.direction.x << " " << light.direction.y << " " << light.direction.z << "\n";
+	std::cout << light.diffuseIntensity << "\n";
+	std::cout << light.ambientIntensity << "\n";
 
 	vkMapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex], 0, sizeof(UniformLight), 0, &data);
-	memcpy(data, &light, sizeof(UniformLight) * meshList.size());
+	memcpy(data, &light, sizeof(UniformLight));
 	vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
 }
 

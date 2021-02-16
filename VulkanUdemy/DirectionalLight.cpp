@@ -15,24 +15,12 @@ DirectionalLight::DirectionalLight(float red, float green, float blue,
 UniformLight DirectionalLight::getLight()
 {
 	UniformLight light = {};
+	light.colour = colour;
 	light.direction = direction;
 	light.ambientIntensity = ambientIntensity;
 	light.diffuseIntensity = diffuseIntensity;
-	light.colour = colour;
 	
 	return light;
-}
-
-void DirectionalLight::UseLight(uint32_t ambientIntensityLocation, uint32_t ambientColourLocation,
-	uint32_t diffuseIntensityLocation, uint32_t directionLocation)
-{
-	/*
-		glUniform3f(ambientColourLocation, colour.x, colour.y, colour.z);
-		glUniform1f(ambientIntensityLocation, ambientIntensity);
-
-		glUniform3f(directionLocation, direction.x, direction.y, direction.z);
-		glUniform1f(diffuseIntensityLocation, diffuseIntensity);
-	*/
 }
 
 void DirectionalLight::UpdatePosition(float xDir, float yDir, float zDir)

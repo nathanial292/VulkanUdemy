@@ -15,7 +15,7 @@ layout(set = 0, binding = 1) uniform UboModel {
 	bool hasTexture;
 } uboModel;
 
-// Also dynamic buffer
+// Uniform buffer for light
 layout(set = 0, binding = 2) uniform DirectionalLight {
 	vec3 colour;
 	vec3 direction;
@@ -25,22 +25,38 @@ layout(set = 0, binding = 2) uniform DirectionalLight {
 
 vec4 CalcDirectionalLight()
 {
-	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * directionalLight.ambientIntensity;
+	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.01;
 	
-	// Normal mapping
 	vec3 normal = normalize(Normal);
 	vec3 lightDir = normalize(directionalLight.direction - FragPos);
 	
 	float diffuseFactor = max(dot(normal, lightDir), 0.0f);
-	vec4 diffuseColour = vec4(directionalLight.colour * directionalLight.diffuseIntensity * diffuseFactor, 1.0f);
+	
+	
+	vec4 diffuseColour = vec4(directionalLight.colour * 0.7 * diffuseFactor, 1.0f);
 	
 	return (ambientColour + diffuseColour);
 }
 
 void main() 
 {
-	vec4 finalColour = CalcDirectionalLight();
+	vec4 finalColour = CalcDirectionalLight();		
+	if (uboModel.hasTexture) {
+		outColour = texture(textureSampler, fragTex) * finalColour;
 		
-	if (uboModel.hasTexture) outColour = texture(textureSampler, fragTex) * finalColour;
-	else outColour = outColour = vec4(fragCol, 1.0);
+		//vec3 normal = normalize(Normal);
+		//vec3 lightDir = normalize(directionalLight.direction - FragPos);
+		
+		//float diffuseFactor = max(dot(normal, lightDir), 0.0f);
+		
+		//outColour = vec4(diffuseFactor, 1.0, 1.0, 1.0f);
+		//float bug=0.0;
+
+		//if(directionalLight.direction.y <= 0) bug=1.0;
+
+		//outColour.x+=bug;
+	}
+	else {
+		outColour = vec4(fragCol, 1.0);
+	}
 }

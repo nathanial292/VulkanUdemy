@@ -34,8 +34,8 @@ public:
 		theWindow->Initialise();
 
 		light = DirectionalLight(1.0f, 1.0f, 1.0f,
-			0.15f, 0.8f,
-			0.0f, 6.0f, -10.0f);
+			0.05f, 0.5f,
+			5.0f, 6.0f, 6.0f);
 
 		// Create VulkanRenderer Instance
 		if (vulkanRenderer.init(theWindow, camera) == EXIT_FAILURE)
@@ -45,10 +45,6 @@ public:
 
 		// Populate meshList and modelList with vertices
 		CreateObjects();
-
-		light = DirectionalLight(1.0f, 1.0f, 1.0f,
-			0.01f, 1.0f,
-			0.0f, 4.0f, 2.0f);
 
 		float angle = 0.0f;
 		float deltaTime = 0.0f;
@@ -101,10 +97,10 @@ public:
 		};
 
 		std::vector<Vertex> floorVertices = {
-			{ { -40, 0, -40}, { 0.0f, 0.0f, 0.0f}, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f} }, //BL
-			{ { 40, 0, -40}, { 10.0f, 0.0f, 0.0f}, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f} },//BR
-			{ { -40, 0, 40 }, { 0.0f, 10.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f} },//FL
-			{ { 40, 0, 40 }, { 10.0f, 10.0f, 0.0f }, { 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f} }//FR
+			{ { -40, 0, -40}, { 0.0f, 0.0f, 0.0f}, { 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f} }, //BL
+			{ { 40, 0, -40}, { 10.0f, 0.0f, 0.0f}, { 1.0f, 0.0f }, { 0.0f, 0.0f, 0.0f} },//BR
+			{ { -40, 0, 40 }, { 0.0f, 10.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f} },//FL
+			{ { 40, 0, 40 }, { 10.0f, 10.0f, 0.0f }, { 0.0f, 1.0f }, { 0.0f, 0.0f, 0.0f} }//FR
 		};
 
 		std::vector<uint32_t> floorIndices = {
@@ -115,10 +111,16 @@ public:
 		VkPhysicalDevice physicalDevice = vulkanRenderer.getVulkanDevice().physicalDevice;
 		VkDevice logicalDevice = vulkanRenderer.getVulkanDevice().logicalDevice;
 
-		//calcAverageNormals(&floorIndices, floorIndices.size(), &floorVertices, floorVertices.size(), 11);
-		calcAverageNormals(&meshIndices, meshIndices.size(), &meshVertices, meshVertices.size(), 11);
+		calcAverageNormals(&floorIndices, &floorVertices);
+		calcAverageNormals(&meshIndices, &meshVertices);
 
-		std::cout << floorVertices[0].normal.x << " " << floorVertices[0].normal.y << " " << floorVertices[0].normal.z;
+		//std::cout << floorVertices[0].normal.x << " " << floorVertices[0].normal.y << " " << floorVertices[0].normal.z << "\n";
+
+		//std::cout << floorVertices[1].normal.x << " " << floorVertices[1].normal.y << " " << floorVertices[1].normal.z << "\n";
+
+		//std::cout << floorVertices[2].normal.x << " " << floorVertices[2].normal.y << " " << floorVertices[2].normal.z << "\n";
+
+		//std::cout << floorVertices[3].normal.x << " " << floorVertices[3].normal.y << " " << floorVertices[3].normal.z << "\n";
 
 		Mesh firstMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &floorIndices, &floorVertices, vulkanRenderer.createTexture("marble.jpg"));
 		Mesh secondMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &meshIndices, &meshVertices, vulkanRenderer.createTexture("wood.png"));

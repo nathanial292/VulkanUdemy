@@ -273,13 +273,12 @@ static void transitionImageLayout(VkDevice device, VkQueue queue, VkCommandPool 
 }
 
 
-static void calcAverageNormals(std::vector<uint32_t>* indices, unsigned int indiceCount, std::vector<Vertex>* vertices,
-	unsigned int verticeCount, unsigned int vLength)
+static void calcAverageNormals(std::vector<uint32_t>* indices, std::vector<Vertex>* vertices)
 {
 	// For each face in a mesh, ln0, ln1, ln2 correspond to each vertex of that face.
 	// We want to create two new vector
 
-	for (size_t i = 0; i < indiceCount; i += 3)
+	for (size_t i = 0; i < indices->size(); i += 3)
 	{
 		unsigned int ln0 = indices->at(i);
 		unsigned int ln1 = indices->at(i + 1);
@@ -295,8 +294,17 @@ static void calcAverageNormals(std::vector<uint32_t>* indices, unsigned int indi
 		glm::vec3 normal = glm::cross(v1, v2);
 		normal = glm::normalize(normal);
 
-		vertices->at(ln0).normal.x = normal.x; vertices->at(ln0).normal.y = normal.y; vertices->at(ln0).normal.y = normal.y;
-		vertices->at(ln1).normal.x = normal.x; vertices->at(ln1).normal.y = normal.y; vertices->at(ln1).normal.y = normal.y;
-		vertices->at(ln2).normal.x = normal.x; vertices->at(ln2).normal.y = normal.y; vertices->at(ln2).normal.y = normal.y;
+		vertices->at(ln0).normal.x = normal.x; vertices->at(ln0).normal.y = normal.y; vertices->at(ln0).normal.z = normal.z;
+		vertices->at(ln1).normal.x = normal.x; vertices->at(ln1).normal.y = normal.y; vertices->at(ln1).normal.z = normal.z;
+		vertices->at(ln2).normal.x = normal.x; vertices->at(ln2).normal.y = normal.y; vertices->at(ln2).normal.z = normal.z;
+	}
+
+	for (size_t i = 0; i < vertices->size(); i++)
+	{
+		glm::vec3 vec(vertices->at(i).normal.x, vertices->at(i).normal.y, vertices->at(i).normal.z);
+		vec = glm::normalize(vec);
+		vertices->at(i).normal.x = vec.x;
+		vertices->at(i).normal.y = vec.y;
+		vertices->at(i).normal.z = vec.z;
 	}
 }
