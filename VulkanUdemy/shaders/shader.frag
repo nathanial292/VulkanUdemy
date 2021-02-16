@@ -23,7 +23,9 @@ layout(set = 0, binding = 2) uniform DirectionalLight {
 	float diffuseIntensity;
 } directionalLight;
 
-layout(set = 0, binding = 3) uniform vec3 cameraPosition;
+layout(set = 0, binding = 3) uniform CameraPosition {
+	vec3 cameraPos;	
+} cameraPosition;
 
 vec4 CalcDirectionalLight()
 {
@@ -33,11 +35,23 @@ vec4 CalcDirectionalLight()
 	vec3 lightDir = -normalize(directionalLight.direction - FragPos);
 	
 	float diffuseFactor = max(dot(normal, -lightDir), 0.0f);
-	
-	
 	vec4 diffuseColour = vec4(directionalLight.colour * 1.0 * diffuseFactor, 1.0f);
 	
-	return (ambientColour + diffuseColour);
+	vec4 specularColour = vec4(0, 0, 0, 0);
+	if(diffuseFactor > 0.0f)
+	{
+		vec3 fragToEye = normalize(cameraPosition.cameraPos - FragPos);
+		vec3 reflectedVertex = normalize(reflect(lightDir, normal));
+		
+		float specularFactor = dot(fragToEye, reflectedVertex);
+		if(specularFactor > 0.0f)
+		{
+			specularFactor = pow(specularFactor, 128);
+			specularColour = vec4(directionalLight.colour * 0.5 * specularFactor, 1.0f);
+		}
+	}
+	
+	return (ambientColour + diffuseColour + specularColour);
 }
 
 void main() 

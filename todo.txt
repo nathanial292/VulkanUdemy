@@ -1,0 +1,1 @@
+refactor createMeshModel to MeshModel class (Use constructor)
