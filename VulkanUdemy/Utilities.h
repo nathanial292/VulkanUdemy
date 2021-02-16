@@ -292,7 +292,7 @@ static void calcAverageNormals(std::vector<uint32_t>* indices, std::vector<Verte
 		glm::vec3 v2(vertices->at(ln2).pos.x - vertices->at(ln0).pos.x, vertices->at(ln2).pos.y - vertices->at(ln0).pos.y, vertices->at(ln2).pos.z - vertices->at(ln0).pos.z);
 
 		glm::vec3 normal = glm::cross(v1, v2);
-		normal = glm::normalize(normal);
+		normal = glm::normalize(-normal);
 
 		vertices->at(ln0).normal.x = normal.x; vertices->at(ln0).normal.y = normal.y; vertices->at(ln0).normal.z = normal.z;
 		vertices->at(ln1).normal.x = normal.x; vertices->at(ln1).normal.y = normal.y; vertices->at(ln1).normal.z = normal.z;

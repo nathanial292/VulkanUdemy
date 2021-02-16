@@ -25,15 +25,15 @@ layout(set = 0, binding = 2) uniform DirectionalLight {
 
 vec4 CalcDirectionalLight()
 {
-	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.01;
+	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.0;
 	
 	vec3 normal = normalize(Normal);
 	vec3 lightDir = normalize(directionalLight.direction - FragPos);
 	
-	float diffuseFactor = max(dot(normal, lightDir), 0.0f);
+	float diffuseFactor = max(dot(normal, -lightDir), 0.0f);
 	
 	
-	vec4 diffuseColour = vec4(directionalLight.colour * 0.7 * diffuseFactor, 1.0f);
+	vec4 diffuseColour = vec4(directionalLight.colour * 0.95 * diffuseFactor, 1.0f);
 	
 	return (ambientColour + diffuseColour);
 }

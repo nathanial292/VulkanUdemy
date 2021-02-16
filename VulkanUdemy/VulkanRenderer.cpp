@@ -1726,7 +1726,7 @@ MeshModel VulkanRenderer::createMeshModel(std::string modelFile, int texId)
 {
 	// Import model "scene"
 	Assimp::Importer importer;
-	const aiScene *scene = importer.ReadFile(modelFile, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices);
+	const aiScene *scene = importer.ReadFile(modelFile, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices);
 	if (!scene) {
 		throw std::runtime_error("Failed to load model ("+modelFile+")");
 	}
