@@ -96,6 +96,9 @@ Mesh MeshModel::LoadMesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice,
 			vertices[i].tex = { 0.0f, 0.0f };
 		}
 		vertices[i].col = { 1.0f, 1.0f, 1.0f };
+		calcAverageNormals(&indices, indices.size(), &vertices, vertices.size(), 11);
+
+		std::cout << vertices[0].normal.x << " " << vertices[0].normal.y << " " << vertices[0].normal.z;
 	}
 
 	// Go through faces indicies and add to list

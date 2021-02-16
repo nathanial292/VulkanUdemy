@@ -34,8 +34,8 @@ public:
 		theWindow->Initialise();
 
 		light = DirectionalLight(1.0f, 1.0f, 1.0f,
-			0.2f, 0.8f,
-			0.0f, 6.0f, 0.0f);
+			0.15f, 0.8f,
+			0.0f, 6.0f, -10.0f);
 
 		// Create VulkanRenderer Instance
 		if (vulkanRenderer.init(theWindow, camera) == EXIT_FAILURE)
@@ -47,8 +47,8 @@ public:
 		CreateObjects();
 
 		light = DirectionalLight(1.0f, 1.0f, 1.0f,
-			0.1f, 0.8f,
-			0.0f, 6.0f, 0.0f);
+			0.01f, 1.0f,
+			0.0f, 4.0f, 2.0f);
 
 		float angle = 0.0f;
 		float deltaTime = 0.0f;
@@ -70,9 +70,12 @@ public:
 
 			glm::mat4 firstModel(1.0f);
 			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
-
-			//vulkanRenderer.updateModelMesh(0, firstModel);
 			vulkanRenderer.updateModel(0, firstModel);
+
+			firstModel = glm::mat4(1.0f); // Identity matrix
+			firstModel = glm::translate(firstModel, glm::vec3(0.0f, 4.0f, -10.0f));
+			vulkanRenderer.updateModelMesh(1, firstModel);
+
 
 			vulkanRenderer.draw();
 		}
@@ -85,23 +88,23 @@ public:
 	}
 
 	void CreateObjects() {
-		std::vector<Vertex> meshVertices2 = {
-			{ { -2, 2, -2.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f} }, // 0
-			{ { -2, -0.1, -2.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f} }, // 1
-			{ { 2, -0.1, -2.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f} }, // 2
-			{ { 2, 2, -2.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f} }, // 3
+		std::vector<Vertex> meshVertices = {
+			{ { -2, 2, -2.0 },{ 1.0f, 0.0f, 0.0f }, {1.0f, 1.0f}, { 0.0f, 0.0f, 0.0f} }, // 0
+			{ { -2, -0.1, -2.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f}, { 0.0f, 0.0f, 0.0f } }, // 1
+			{ { 2, -0.1, -2.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f}, { 0.0f, 0.0f, 0.0f } }, // 2
+			{ { 2, 2, -2.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f}, { 0.0f, 0.0f, 0.0f } }, // 3
 		};
 		// Index data
-		std::vector<uint32_t> meshIndicies2 = {
+		std::vector<uint32_t> meshIndices = {
 			0, 1, 2,
 			2, 3, 0
 		};
 
 		std::vector<Vertex> floorVertices = {
-			{ { -20.0, 0.0, -20.0}, { 0.0f, 0.0f, 0.0f}, { 1.0f, 1.0f } }, //BL
-			{ { 20.0, 0.0, -20.0}, { 10.0f, 0.0f, 0.0f}, { 1.0f, 0.0f } },//BR
-			{ { -20., 0.0, 20.0 }, { 0.0f, 10.0f, 0.0f }, { 0.0f, 0.0f } },//FL
-			{ { 20.0, 0.0, 20.0 }, { 10.0f, 10.0f, 0.0f }, { 0.0f, 1.0f } }//FR
+			{ { -40, 0, -40}, { 0.0f, 0.0f, 0.0f}, { 1.0f, 1.0f }, { 0.0f, 1.0f, 0.0f} }, //BL
+			{ { 40, 0, -40}, { 10.0f, 0.0f, 0.0f}, { 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f} },//BR
+			{ { -40, 0, 40 }, { 0.0f, 10.0f, 0.0f }, { 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f} },//FL
+			{ { 40, 0, 40 }, { 10.0f, 10.0f, 0.0f }, { 0.0f, 1.0f }, { 0.0f, 1.0f, 0.0f} }//FR
 		};
 
 		std::vector<uint32_t> floorIndices = {
@@ -109,12 +112,16 @@ public:
 			1, 2, 3
 		};
 
-
 		VkPhysicalDevice physicalDevice = vulkanRenderer.getVulkanDevice().physicalDevice;
 		VkDevice logicalDevice = vulkanRenderer.getVulkanDevice().logicalDevice;
 
+		//calcAverageNormals(&floorIndices, floorIndices.size(), &floorVertices, floorVertices.size(), 11);
+		calcAverageNormals(&meshIndices, meshIndices.size(), &meshVertices, meshVertices.size(), 11);
+
+		std::cout << floorVertices[0].normal.x << " " << floorVertices[0].normal.y << " " << floorVertices[0].normal.z;
+
 		Mesh firstMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &floorIndices, &floorVertices, vulkanRenderer.createTexture("marble.jpg"));
-		Mesh secondMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &meshIndicies2, &meshVertices2, vulkanRenderer.createTexture("marble.jpg"));
+		Mesh secondMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &meshIndices, &meshVertices, vulkanRenderer.createTexture("wood.png"));
 
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);

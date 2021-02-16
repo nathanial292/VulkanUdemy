@@ -891,7 +891,7 @@ void VulkanRenderer::createGraphicsPipeline()
 	//VK_VERTEX_INPUT_RATE_INSTANCE: Move to a vertex for the next instance (If you have multiple instances of the same object) - draws the first vertex of each
 
 	// How the data for an attribute is defined within a vertex
-	std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions;
+	std::array<VkVertexInputAttributeDescription, 4> attributeDescriptions;
 
 	// Position attribute
 	attributeDescriptions[0].binding = 0; // Which binding the data is at (should be the same as above binding value)
@@ -910,6 +910,12 @@ void VulkanRenderer::createGraphicsPipeline()
 	attributeDescriptions[2].location = 2;
 	attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
 	attributeDescriptions[2].offset = offsetof(Vertex, tex);
+
+	// Color Attribute
+	attributeDescriptions[3].binding = 0;
+	attributeDescriptions[3].location = 3;
+	attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+	attributeDescriptions[3].offset = offsetof(Vertex, normal);
 
 	// Vertex Input
 	VkPipelineVertexInputStateCreateInfo vertexInputCreateInfo = {};

@@ -2,6 +2,8 @@
 
 layout(location = 0) in vec3 fragCol;
 layout(location = 1) in vec2 fragTex;
+layout(location = 2) in vec3 Normal;
+layout(location = 3) in vec3 FragPos;
 
 layout(set = 1, binding = 0) uniform sampler2D textureSampler;
 
@@ -21,23 +23,23 @@ layout(set = 0, binding = 2) uniform DirectionalLight {
 	float diffuseIntensity;
 } directionalLight;
 
-vec3 CalcDirectionalLight()
+vec4 CalcDirectionalLight()
 {
-	vec3 ambientColour = directionalLight.colour * directionalLight.ambientIntensity;
+	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * directionalLight.ambientIntensity;
 	
 	// Normal mapping
-	//vec3 normal = normalize(Normal);
-	//vec3 lightDir = normalize(direction);
+	vec3 normal = normalize(Normal);
+	vec3 lightDir = normalize(directionalLight.direction - FragPos);
 	
-	//float diffuseFactor = max(dot(normal, lightDir), 0.0f);
-	//vec4 diffuseColour = vec4(light.colour * light.diffuseIntensity * diffuseFactor, 1.0f);
+	float diffuseFactor = max(dot(normal, lightDir), 0.0f);
+	vec4 diffuseColour = vec4(directionalLight.colour * directionalLight.diffuseIntensity * diffuseFactor, 1.0f);
 	
-	return ambientColour;
+	return (ambientColour + diffuseColour);
 }
 
 void main() 
 {
-	vec4 finalColour = vec4(CalcDirectionalLight(),1.0);
+	vec4 finalColour = CalcDirectionalLight();
 		
 	if (uboModel.hasTexture) outColour = texture(textureSampler, fragTex) * finalColour;
 	else outColour = outColour = vec4(fragCol, 1.0);
