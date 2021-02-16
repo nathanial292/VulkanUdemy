@@ -35,7 +35,7 @@ public:
 
 		light = DirectionalLight(1.0f, 1.0f, 1.0f,
 			0.05f, 0.5f,
-			8.0f, -10.0f, 8.0f);
+			8.0f, 10.0f, 8.0f);
 
 		// Create VulkanRenderer Instance
 		if (vulkanRenderer.init(theWindow, camera) == EXIT_FAILURE)
@@ -65,7 +65,7 @@ public:
 			if (angle > 360.0f) angle = 0.0f;
 
 			glm::mat4 firstModel(1.0f);
-			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
+			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 			vulkanRenderer.updateModel(0, firstModel);
 
 			firstModel = glm::mat4(1.0f); // Identity matrix
@@ -160,13 +160,19 @@ public:
 		calcAverageNormals(&floorIndices, &floorVertices);
 		calcAverageNormals(&meshIndices, &meshVertices);
 
-		//std::cout << floorVertices[0].normal.x << " " << floorVertices[0].normal.y << " " << floorVertices[0].normal.z << "\n";
+		std::cout << "FRONT FACE" << "\n";
 
-		//std::cout << floorVertices[1].normal.x << " " << floorVertices[1].normal.y << " " << floorVertices[1].normal.z << "\n";
+		std::cout << meshVertices[0].normal.x << " " << meshVertices[0].normal.y << " " << meshVertices[0].normal.z << "\n";
+		std::cout << meshVertices[1].normal.x << " " << meshVertices[1].normal.y << " " << meshVertices[1].normal.z << "\n";
+		std::cout << meshVertices[2].normal.x << " " << meshVertices[2].normal.y << " " << meshVertices[2].normal.z << "\n";
+		std::cout << meshVertices[3].normal.x << " " << meshVertices[3].normal.y << " " << meshVertices[3].normal.z << "\n";
 
-		//std::cout << floorVertices[2].normal.x << " " << floorVertices[2].normal.y << " " << floorVertices[2].normal.z << "\n";
+		std::cout << "RIGHT FACE" << "\n";
 
-		//std::cout << floorVertices[3].normal.x << " " << floorVertices[3].normal.y << " " << floorVertices[3].normal.z << "\n";
+		std::cout << meshVertices[4].normal.x << " " << meshVertices[4].normal.y << " " << meshVertices[4].normal.z << "\n";
+		std::cout << meshVertices[5].normal.x << " " << meshVertices[5].normal.y << " " << meshVertices[5].normal.z << "\n";
+		std::cout << meshVertices[6].normal.x << " " << meshVertices[6].normal.y << " " << meshVertices[6].normal.z << "\n";
+		std::cout << meshVertices[7].normal.x << " " << meshVertices[7].normal.y << " " << meshVertices[7].normal.z << "\n";
 
 		Mesh firstMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &floorIndices, &floorVertices, vulkanRenderer.createTexture("marble.jpg"));
 		Mesh secondMesh = Mesh(physicalDevice, logicalDevice, vulkanRenderer.getGraphicsQueue(), vulkanRenderer.getGraphicsCommandPool(), &meshIndices, &meshVertices, vulkanRenderer.createTexture("wood.png"));

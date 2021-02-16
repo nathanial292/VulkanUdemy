@@ -213,6 +213,9 @@ private:
 	std::vector<VkDeviceMemory> directionalLightUniformBufferMemory;
 	DirectionalLight directionalLight;
 
+	std::vector<VkBuffer> cameraPositionUniformBuffer;
+	std::vector<VkDeviceMemory> cameraPositionUniformBufferMemory;
+
 	// Synchronisation
 	std::vector<VkSemaphore> imageAvailable;
 	std::vector<VkSemaphore> renderFinished;

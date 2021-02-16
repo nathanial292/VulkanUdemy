@@ -1187,7 +1187,14 @@ void VulkanRenderer::createDescriptorSetLayout()
 	lightLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 	lightLayoutBinding.pImmutableSamplers = nullptr;
 
-	std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { vpLayoutBinding, modelLayoutBinding, lightLayoutBinding };
+	VkDescriptorSetLayoutBinding cameraLayoutBinding = {};
+	cameraLayoutBinding.binding = 3;
+	cameraLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	cameraLayoutBinding.descriptorCount = 1;
+	cameraLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	cameraLayoutBinding.pImmutableSamplers = nullptr;
+
+	std::vector<VkDescriptorSetLayoutBinding> layoutBindings = { vpLayoutBinding, modelLayoutBinding, lightLayoutBinding, cameraLayoutBinding };
 
 	// Create Descriptor Set Layout with given bindings
 	VkDescriptorSetLayoutCreateInfo createInfo = {};
@@ -1235,6 +1242,7 @@ void VulkanRenderer::createUniformBuffers()
 	VkDeviceSize vpBufferSize = sizeof(UboViewProjection);
 	VkDeviceSize modelBufferSize = modelUniformAlignment * MAX_OBJECTS;
 	VkDeviceSize directionalLightBufferSize = sizeof(UniformLight);
+	VkDeviceSize cameraPositionBufferSize = sizeof(CameraPosition);
 
 	// One uniform buffer for each image (and by extention, command buffer)
 	vpUniformBuffer.resize(swapChainImages.size());
@@ -1246,6 +1254,9 @@ void VulkanRenderer::createUniformBuffers()
 	directionalLightUniformBuffer.resize(swapChainImages.size());
 	directionalLightUniformBufferMemory.resize(swapChainImages.size());
 
+	cameraPositionUniformBuffer.resize(swapChainImages.size());
+	cameraPositionUniformBufferMemory.resize(swapChainImages.size());
+
 	// Create the uniform buffers
 	for (size_t i = 0; i < swapChainImages.size(); i++) {
 		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, vpBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -1256,6 +1267,9 @@ void VulkanRenderer::createUniformBuffers()
 
 		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, directionalLightBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &directionalLightUniformBuffer[i], &directionalLightUniformBufferMemory[i]);
+
+		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, cameraPositionBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, &cameraPositionUniformBuffer[i], &cameraPositionUniformBufferMemory[i]);
 	}
 }
 
@@ -1276,7 +1290,11 @@ void VulkanRenderer::createDescriptorPool()
 	directionalLightPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	directionalLightPoolSize.descriptorCount = static_cast<uint32_t>(directionalLightUniformBuffer.size());
 
-	std::vector<VkDescriptorPoolSize> descriptorPoolSizes = { vpPoolSize, modelPoolSize, directionalLightPoolSize };
+	VkDescriptorPoolSize cameraPositionPoolSize = {};
+	cameraPositionPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	cameraPositionPoolSize.descriptorCount = static_cast<uint32_t>(cameraPositionUniformBuffer.size());
+
+	std::vector<VkDescriptorPoolSize> descriptorPoolSizes = { vpPoolSize, modelPoolSize, directionalLightPoolSize, cameraPositionPoolSize };
 
 	VkDescriptorPoolCreateInfo poolCreateInfo = {};
 	poolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1377,7 +1395,25 @@ void VulkanRenderer::createDescriptorSets()
 		lightSetWrite.descriptorCount = 1;
 		lightSetWrite.pBufferInfo = &lightBufferInfo; // Information about buffer data to bind
 
-		std::vector<VkWriteDescriptorSet> setWrites = { vpSetWrite, modelSetWrite, lightSetWrite };
+
+		// CAMERA LIGHT UNIFORM DESCRIPTOR
+		// Buffer info and data offset info
+		VkDescriptorBufferInfo cameraPositionInfo = {};
+		cameraPositionInfo.buffer = cameraPositionUniformBuffer[i]; // Buffer to get data from
+		cameraPositionInfo.offset = 0; // Position where data starts
+		cameraPositionInfo.range = sizeof(CameraPosition); // Size of data 
+
+		// Data about connection between binding and buffer
+		VkWriteDescriptorSet cameraPositionSetWrite = {};
+		cameraPositionSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		cameraPositionSetWrite.dstSet = descriptorSets[i]; // Descriptor set to update
+		cameraPositionSetWrite.dstBinding = 3; // Binding to update (matches with binding on layout/shader)
+		cameraPositionSetWrite.dstArrayElement = 0; // Index in array to update
+		cameraPositionSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		cameraPositionSetWrite.descriptorCount = 1;
+		cameraPositionSetWrite.pBufferInfo = &cameraPositionInfo; // Information about buffer data to bind
+
+		std::vector<VkWriteDescriptorSet> setWrites = { vpSetWrite, modelSetWrite, lightSetWrite, cameraPositionSetWrite };
 
 		// Update the descriptor sets with new buffer binding info
 		vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(setWrites.size()), setWrites.data(), 0, nullptr);
@@ -1429,12 +1465,24 @@ void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
 
 	UniformLight light = directionalLight.getLight();
 	//std::cout << light.direction.x << " " << light.direction.y << " " << light.direction.z << "\n";
-	std::cout << light.diffuseIntensity << "\n";
-	std::cout << light.ambientIntensity << "\n";
+	//std::cout << light.diffuseIntensity << "\n";
+	//std::cout << light.ambientIntensity << "\n";
 
 	vkMapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex], 0, sizeof(UniformLight), 0, &data);
 	memcpy(data, &light, sizeof(UniformLight));
 	vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
+
+	//CameraPosition cameraPosition = (*camera).getCameraPosition();
+
+
+	CameraPosition cameraPosition = {};
+	cameraPosition.cameraPos = glm::vec3(1.0, 1.0, 1.0);
+	std::cout << "CAMERA POSITION" << "\n";
+	std::cout << cameraPosition.cameraPos.x << " " << cameraPosition.cameraPos.y << " " << cameraPosition.cameraPos.z << "\n";
+
+	vkMapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex], 0, sizeof(CameraPosition), 0, &data);
+	memcpy(data, &cameraPosition, sizeof(CameraPosition));
+	vkUnmapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex]);
 }
 
 void VulkanRenderer::recordCommands(uint32_t currentImage)

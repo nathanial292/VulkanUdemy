@@ -96,7 +96,7 @@ Mesh MeshModel::LoadMesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice,
 			vertices[i].tex = { 0.0f, 0.0f };
 		}
 		vertices[i].col = { 1.0f, 1.0f, 1.0f };
-		vertices[i].normal = { -mesh->mNormals[i].x, -mesh->mNormals[i].y, -mesh->mNormals[i].z };
+		vertices[i].normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
 		//calcAverageNormals(&indices, &vertices);
 
 		//std::cout << vertices[i].normal.x << " " << vertices[i].normal.y << " " << vertices[i].normal.z;

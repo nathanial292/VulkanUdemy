@@ -23,17 +23,21 @@ layout(set = 0, binding = 2) uniform DirectionalLight {
 	float diffuseIntensity;
 } directionalLight;
 
+layout(set = 0, binding = 3) uniform CameraPosition {
+	vec3 cameraPos;
+} cameraPosition;
+
 vec4 CalcDirectionalLight()
 {
-	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.0;
+	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.1;
 	
 	vec3 normal = normalize(Normal);
-	vec3 lightDir = normalize(directionalLight.direction - FragPos);
+	vec3 lightDir = -normalize(directionalLight.direction - FragPos);
 	
 	float diffuseFactor = max(dot(normal, -lightDir), 0.0f);
 	
 	
-	vec4 diffuseColour = vec4(directionalLight.colour * 0.95 * diffuseFactor, 1.0f);
+	vec4 diffuseColour = vec4(directionalLight.colour * 1.0 * diffuseFactor, 1.0f);
 	
 	return (ambientColour + diffuseColour);
 }

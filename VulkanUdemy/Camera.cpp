@@ -1,4 +1,5 @@
 #include "Camera.h"
+#include <iostream>
 
 Camera::Camera()
 {
@@ -61,9 +62,13 @@ glm::mat4 Camera::calculateViewMatrix()
 	return glm::lookAt(position, position + front, up);
 }
 
-glm::vec3 Camera::getCameraPosition()
+CameraPosition Camera::getCameraPosition()
 {
-	return position;
+	CameraPosition positionStruct = {};
+	positionStruct.cameraPos = position;
+
+	//std::cout << position.x << " " << position.y << " " << position.z << "\n";
+	return positionStruct;
 }
 
 void Camera::update()
