@@ -21,6 +21,7 @@ int VulkanRenderer::init(Window* newWindow, Camera* newCamera)
 		createLogicalDevice();
 		createSwapChain();
 		createDepthBufferImage();
+		createColourImage();
 		createRenderPass();
 		createDescriptorSetLayout();
 		createPushConstantRange();
@@ -59,6 +60,7 @@ void VulkanRenderer::recreateSwapChain()
 	cleanupSwapChain();
 	createSwapChain();
 	createDepthBufferImage();
+	createColourImage();
 	createRenderPass();
 	createGraphicsPipeline();
 	createFrameBuffers();
@@ -136,6 +138,11 @@ void VulkanRenderer::cleanupSwapChain() {
 	vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView, nullptr);
 	vkDestroyImage(mainDevice.logicalDevice, depthBufferImage, nullptr);
 	vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory, nullptr);
+
+	// Cleanup for colour buffer
+	vkDestroyImageView(mainDevice.logicalDevice, colourImageView, nullptr);
+	vkDestroyImage(mainDevice.logicalDevice, colourImage, nullptr);
+	vkFreeMemory(mainDevice.logicalDevice, colourImageMemory, nullptr);
 
 	for (auto image : swapChainImages) {
 		//vkDestroyImage(mainDevice.logicalDevice, image.image, nullptr);
@@ -401,6 +408,7 @@ void VulkanRenderer::getPhysicalDevice()
 		if (checkDeviceSuitable(device))
 		{
 			mainDevice.physicalDevice = device;
+			msaaSamples = getMaxUseableSampleCount();
 			break;
 		}
 	}
@@ -609,6 +617,22 @@ SwapChainDetails VulkanRenderer::getSwapChainDetails(VkPhysicalDevice device)
 	return swapChainDetails;
 }
 
+VkSampleCountFlagBits VulkanRenderer::getMaxUseableSampleCount()
+{
+	VkPhysicalDeviceProperties physicalDeviceProperties;
+	vkGetPhysicalDeviceProperties(mainDevice.physicalDevice, &physicalDeviceProperties);
+
+	VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+	if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+	if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+	if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+	if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+	if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+	if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+	return VK_SAMPLE_COUNT_1_BIT;
+}
+
 // Best format various based on application specification, will use VK_FORMAT_R8G8B8A8_UNIFORM || VK_FORMAT_B8G8R8A8_UNORM (Backup)
 // Color space, SRGB, AdobeRGB etc. Will use VK_COLOR_SPACE_SRGB_NONLINEAR_KHR (SRGB)
 VkSurfaceFormatKHR VulkanRenderer::chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats)
@@ -775,22 +799,31 @@ void VulkanRenderer::createRenderPass()
 {
 	// ATTACHMENTS
 	// Color Attachment of render pass
-	VkAttachmentDescription colorAttachment = {};
-	colorAttachment.format = swapChainImageFormat; // Format to use for attachment 
-	colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples to write for multisampling
-	colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Describes what to do with attachment before rendering
-	colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // What to do with attachment after rendering
-	colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // Describes what to do with stencil before rendering
-	colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Describes what to do with stencil after rendering
-
+	VkAttachmentDescription colourAttachment = {};
+	colourAttachment.format = swapChainImageFormat; // Format to use for attachment 
+	colourAttachment.samples = msaaSamples; // Number of samples to write for multisampling
+	colourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Describes what to do with attachment before rendering
+	colourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // What to do with attachment after rendering
+	colourAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // Describes what to do with stencil before rendering
+	colourAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Describes what to do with stencil after rendering
 	// Framebuffer data will be stored as an image, but images can be given different layouts
 	// to give optimal use for certain operations
-	colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Image data layout before render pass starts
-	colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Image data layout after render pass (to change to)
+	colourAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Image data layout before render pass starts
+	colourAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Image data layout after render pass (to change to)
+
+	VkAttachmentDescription colourAttachmentResolve = {};
+	colourAttachmentResolve.format = swapChainImageFormat;
+	colourAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+	colourAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colourAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+	colourAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	colourAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+	colourAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	colourAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 	VkAttachmentDescription depthAttachment = {};
 	depthAttachment.format = depthBufferFormat;
-	depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+	depthAttachment.samples = msaaSamples;
 	depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -800,22 +833,27 @@ void VulkanRenderer::createRenderPass()
 
 	// REFERENCES
 	// Attachment reference uses an attachment index that refers to the attachment list passed to renderPassCreateInfo
-	VkAttachmentReference colorAttachmentReference = {};
-	colorAttachmentReference.attachment = 0; // Use the first attachment in the list passed to renderPassCreateInfo
-	colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	VkAttachmentReference colourAttachmentReference = {};
+	colourAttachmentReference.attachment = 0; // Use the first attachment in the list passed to renderPassCreateInfo
+	colourAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+	// Attachment for the colour resolve intermediate
+	VkAttachmentReference colourAttachmentResolveRef = {};
+	colourAttachmentResolveRef.attachment = 1;
+	colourAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 	// Attachment for the depth stencil
 	VkAttachmentReference depthAttachmentReference = {};
-	depthAttachmentReference.attachment = 1; // At index 1 of our attachments
+	depthAttachmentReference.attachment = 2; // At index 1 of our attachments
 	depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
 
 	// Information about a particular subpass the render pass is using
 	VkSubpassDescription subpass = {};
 	subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	subpass.colorAttachmentCount = 1;
-	subpass.pColorAttachments = &colorAttachmentReference;
+	subpass.pColorAttachments = &colourAttachmentReference;
 	subpass.pDepthStencilAttachment = &depthAttachmentReference;
+	subpass.pResolveAttachments = &colourAttachmentResolveRef;
 
 	// Need to determine when layout transitions occur using subpass dependencies
 	std::array<VkSubpassDependency, 2> subpassDependencies;
@@ -842,7 +880,8 @@ void VulkanRenderer::createRenderPass()
 	subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 	subpassDependencies[1].dependencyFlags = 0;
 
-	std::array<VkAttachmentDescription, 2> renderPassAttachments = { colorAttachment, depthAttachment };
+
+	std::array<VkAttachmentDescription, 3> renderPassAttachments = { colourAttachment, colourAttachmentResolve, depthAttachment };
 
 	VkRenderPassCreateInfo renderPassCreateInfo = {};
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -986,7 +1025,7 @@ void VulkanRenderer::createGraphicsPipeline()
 	VkPipelineMultisampleStateCreateInfo multisampleCreateInfo = {};
 	multisampleCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampleCreateInfo.sampleShadingEnable = VK_FALSE; // Enable multisample shading or not
-	multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // Number of samples to use per fragment
+	multisampleCreateInfo.rasterizationSamples = msaaSamples; // Number of samples to use per fragment
 
 	// Blending
 	VkPipelineColorBlendAttachmentState colorState = {};
@@ -1077,7 +1116,7 @@ void VulkanRenderer::createDepthBufferImage()
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 	// Create the depth buffer image
-	depthBufferImage = createImage(swapChainExtent.width, swapChainExtent.height, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthBufferImageMemory);
+	depthBufferImage = createImage(swapChainExtent.width, swapChainExtent.height, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthBufferImageMemory, msaaSamples);
 
 	// Create depth buffer image view
 	depthBufferImageView = createImageView(depthBufferImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -1089,9 +1128,10 @@ void VulkanRenderer::createFrameBuffers()
 	swapChainFramebuffers.resize(swapChainImages.size());
 	for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
 
-		std::array<VkImageView, 2> attachments = {
+		std::array<VkImageView, 3> attachments = {
 			swapChainImages[i].imageView,
-			depthBufferImageView
+			depthBufferImageView,
+			colourImageView
 		};
 
 		VkFramebufferCreateInfo frameBufferCreateInfo = {};
@@ -1478,8 +1518,8 @@ void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
 	vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
 
 	glm::vec3 cameraPosition = camera->getCameraPosition();
-	std::cout << "CAMERA POSITION" << "\n";
-	std::cout << cameraPosition.x << " " << cameraPosition.y << " " << cameraPosition.z << "\n";
+	//std::cout << "CAMERA POSITION" << "\n";
+	//std::cout << cameraPosition.x << " " << cameraPosition.y << " " << cameraPosition.z << "\n";
 
 	vkMapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex], 0, sizeof(glm::vec3), 0, &data);
 	memcpy(data, &cameraPosition, sizeof(glm::vec3));
@@ -1622,7 +1662,7 @@ VkShaderModule VulkanRenderer::createShaderModule(const std::vector<char>& code)
 	return shaderModule;
 }
 
-VkImage VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory)
+VkImage VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory, VkSampleCountFlagBits numSamples)
 {
 	// CREATE IMAGE
 	VkImageCreateInfo imageCreateInfo = {};
@@ -1639,6 +1679,8 @@ VkImage VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat fo
 	imageCreateInfo.usage = useFlags; // Being used as a depth buffer attachment (Bit flag defining what image will be used for)
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multisamples
 	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
+	imageCreateInfo.samples = numSamples;
+
 
 	VkImage image;
 	VkResult result = vkCreateImage(mainDevice.logicalDevice, &imageCreateInfo, nullptr, &image);
@@ -1694,7 +1736,7 @@ int VulkanRenderer::createTextureImage(std::string fileName)
 	// Create image to hold final texture
 	VkImage texImage;
 	VkDeviceMemory texImageMemory;
-	texImage = createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texImageMemory);
+	texImage = createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texImageMemory, VK_SAMPLE_COUNT_1_BIT);
 
 	// Transition image to be DST for copy operation
 	transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, texImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -1786,7 +1828,11 @@ MeshModel VulkanRenderer::createMeshModel(std::string modelFile, int texId)
 	// Conversion from materials list IDs to our descriptor array IDs
 	std::vector<int> matToTex(textureNames.size());
 
+	std::cout << textureNames.size();
+
 	for (size_t i = 0; i < textureNames.size(); i++) {
+		
+		std::cout << textureNames[i] << " " << i <<"\n";
 		// If material has no texture, set 0 to indicate no texture. texture 0 will be reserved for default texture
 		if (textureNames[i].empty() && texId != NULL) {
 			matToTex[i] = texId;
@@ -1807,6 +1853,14 @@ MeshModel VulkanRenderer::createMeshModel(std::string modelFile, int texId)
 	MeshModel meshModel = MeshModel(modelMeshes);
 
 	return meshModel;
+}
+
+void VulkanRenderer::createColourImage()
+{
+	VkFormat colourFormat = swapChainImageFormat;
+
+	colourImage = createImage(swapChainExtent.width, swapChainExtent.height, colourFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &colourImageMemory, msaaSamples);
+	colourImageView = createImageView(colourImage, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
 stbi_uc* VulkanRenderer::loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize)

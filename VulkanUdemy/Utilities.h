@@ -46,10 +46,12 @@ struct Vertex {
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
+
+//const bool enableValidationLayers = true;
 #ifdef NDEBUG
-const bool enableValidationLayers = false;
+//const bool enableValidationLayers = true;
 #else
-const bool enableValidationLayers = false;
+const bool enableValidationLayers = true;
 #endif
 
 // Callback function for validation debugging (will be called when validation information record)

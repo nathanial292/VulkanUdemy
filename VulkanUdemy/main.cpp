@@ -35,7 +35,7 @@ public:
 
 		light = DirectionalLight(1.0f, 1.0f, 1.0f,
 			0.05f, 0.5f,
-			8.0f, 10.0f, 8.0f);
+			8.0f, 20.0f, 8.0f);
 
 		// Create VulkanRenderer Instance
 		if (vulkanRenderer.init(theWindow, camera) == EXIT_FAILURE)
@@ -65,12 +65,16 @@ public:
 			if (angle > 360.0f) angle = 0.0f;
 
 			glm::mat4 firstModel(1.0f);
+
+
+			firstModel = glm::scale(firstModel, glm::vec3(0.4f, 0.4f, 0.4f));
+			firstModel = glm::translate(firstModel, glm::vec3(10.0f, -0.3f, 20.0f));
 			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
 			vulkanRenderer.updateModel(0, firstModel);
 
 			firstModel = glm::mat4(1.0f); // Identity matrix
-			firstModel = glm::translate(firstModel, glm::vec3(0.0f, 2.0f, -4.0f));
-			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
+			firstModel = glm::translate(firstModel, glm::vec3(0.0f, 2.0f, -2.0f));
+			//firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
 			vulkanRenderer.updateModelMesh(1, firstModel);
 
 			vulkanRenderer.draw();
@@ -89,7 +93,6 @@ public:
 			{ { -2, -0.1, -2.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f}, { 0.0f, 0.0f, 0.0f } }, // 1
 			{ { 2, -0.1, -2.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f}, { 0.0f, 0.0f, 0.0f } }, // 2
 			{ { 2, 2, -2.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f}, { 0.0f, 0.0f, 0.0f } } // 3
-
 		};
 
 		// Index data
@@ -99,7 +102,6 @@ public:
 		};
 
 		std::vector<Vertex> meshVertices = {
-
 			{ { -1.0, -1.0, 1.0 }, { 1.0, 1.0, 1.0 }, { 0.0, 0.0 }, { 0.0, 0.0, 0.0 }}, // 0
 			{ { 1.0, -1.0, 1.0 }, { 1.0, 1.0, 1.0 }, { 1.0, 0.0 }, { 0.0, 0.0, 0.0 }},
 			{ { -1.0, 1.0, 1.0 }, { 1.0, 1.0, 1.0 }, { 0.0, 1.0 }, { 0.0, 0.0, 0.0 }},
@@ -180,8 +182,9 @@ public:
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);
 
-		MeshModel meshModel = vulkanRenderer.createMeshModel("models/chair_01.obj", vulkanRenderer.createTexture("wood.png"));
-		modelList.push_back(meshModel);
+		//MeshModel meshModel1 = vulkanRenderer.createMeshModel("models/Earth 2K.obj", vulkanRenderer.createTexture("Textures/Diffuse_2K.jpg")); 
+		//MeshModel meshModel1 = vulkanRenderer.createMeshModel("models/chair_01.obj", vulkanRenderer.createTexture("cottage_diffuse.png"));
+		//modelList.push_back(meshModel1);
 
 		for (size_t i = 0; i <= MAX_FRAME_DRAWS; ++i) {
 			vulkanRenderer.updateUniformBuffers(i);

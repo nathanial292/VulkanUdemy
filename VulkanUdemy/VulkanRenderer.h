@@ -101,6 +101,7 @@ public:
 	// Getter Functions
 	QueueFamilyIndicies getQueueFamilies(VkPhysicalDevice device);
 	SwapChainDetails getSwapChainDetails(VkPhysicalDevice device);
+	VkSampleCountFlagBits getMaxUseableSampleCount();
 
 	// Choose Functions
 	VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
@@ -111,7 +112,7 @@ public:
 	// Create Functions
 	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
-	VkImage createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory);
+	VkImage createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory, VkSampleCountFlagBits numSamples);
 
 	int createTextureImage(std::string fileName);
 	int createTexture(std::string fileName);
@@ -119,6 +120,9 @@ public:
 
 	// Model creation
 	MeshModel createMeshModel(std::string modelFile, int texId);
+
+	// Colour Resources
+	void createColourImage();
 
 	// Loader Functions
 	stbi_uc* loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize); // Return a unsigned char byte array
@@ -152,10 +156,16 @@ private:
 	std::vector<VkFramebuffer> swapChainFramebuffers;
 	std::vector<VkCommandBuffer> commandBuffers;
 
+	// Depth buffer class members
 	VkImage depthBufferImage;
 	VkDeviceMemory depthBufferImageMemory;
 	VkImageView depthBufferImageView;
 	VkFormat depthBufferFormat;
+
+	// Multisample class members
+	VkImage colourImage;
+	VkDeviceMemory colourImageMemory;
+	VkImageView colourImageView;
 
 	VkSampler textureSampler;
 
@@ -167,6 +177,9 @@ private:
 	// Scene objects
 	std::vector<MeshModel> modelList;
 	std::vector<Mesh> meshList;
+
+	// Multisample count
+	VkSampleCountFlagBits msaaSamples;
 
 	// Pipeline
 	VkPipelineLayout pipelineLayout;
