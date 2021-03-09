@@ -408,7 +408,8 @@ void VulkanRenderer::getPhysicalDevice()
 		if (checkDeviceSuitable(device))
 		{
 			mainDevice.physicalDevice = device;
-			msaaSamples = getMaxUseableSampleCount();
+			//msaaSamples = getMaxUseableSampleCount();
+			msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 			break;
 		}
 	}
@@ -844,7 +845,7 @@ void VulkanRenderer::createRenderPass()
 
 	// Attachment for the depth stencil
 	VkAttachmentReference depthAttachmentReference = {};
-	depthAttachmentReference.attachment = 2; // At index 1 of our attachments
+	depthAttachmentReference.attachment = 1; // At index 1 of our attachments
 	depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
 	// Information about a particular subpass the render pass is using
@@ -853,7 +854,6 @@ void VulkanRenderer::createRenderPass()
 	subpass.colorAttachmentCount = 1;
 	subpass.pColorAttachments = &colourAttachmentReference;
 	subpass.pDepthStencilAttachment = &depthAttachmentReference;
-	subpass.pResolveAttachments = &colourAttachmentResolveRef;
 
 	// Need to determine when layout transitions occur using subpass dependencies
 	std::array<VkSubpassDependency, 2> subpassDependencies;
@@ -880,8 +880,7 @@ void VulkanRenderer::createRenderPass()
 	subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
 	subpassDependencies[1].dependencyFlags = 0;
 
-
-	std::array<VkAttachmentDescription, 3> renderPassAttachments = { colourAttachment, colourAttachmentResolve, depthAttachment };
+	std::array<VkAttachmentDescription, 2> renderPassAttachments = { colourAttachment, depthAttachment };
 
 	VkRenderPassCreateInfo renderPassCreateInfo = {};
 	renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
@@ -1131,7 +1130,6 @@ void VulkanRenderer::createFrameBuffers()
 		std::array<VkImageView, 3> attachments = {
 			swapChainImages[i].imageView,
 			depthBufferImageView,
-			colourImageView
 		};
 
 		VkFramebufferCreateInfo frameBufferCreateInfo = {};
@@ -1679,7 +1677,7 @@ VkImage VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat fo
 	imageCreateInfo.usage = useFlags; // Being used as a depth buffer attachment (Bit flag defining what image will be used for)
 	imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multisamples
 	imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
-	imageCreateInfo.samples = numSamples;
+	//imageCreateInfo.samples = numSamples;
 
 
 	VkImage image;

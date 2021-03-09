@@ -182,9 +182,9 @@ public:
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);
 
-		//MeshModel meshModel1 = vulkanRenderer.createMeshModel("models/Earth 2K.obj", vulkanRenderer.createTexture("Textures/Diffuse_2K.jpg")); 
+		MeshModel meshModel1 = vulkanRenderer.createMeshModel("models/cottage.obj", vulkanRenderer.createTexture("cottage_diffuse.png"));
 		//MeshModel meshModel1 = vulkanRenderer.createMeshModel("models/chair_01.obj", vulkanRenderer.createTexture("cottage_diffuse.png"));
-		//modelList.push_back(meshModel1);
+		modelList.push_back(meshModel1);
 
 		for (size_t i = 0; i <= MAX_FRAME_DRAWS; ++i) {
 			vulkanRenderer.updateUniformBuffers(i);
