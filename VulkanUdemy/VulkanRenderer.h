@@ -24,11 +24,6 @@
 #include <algorithm>
 #include <array>
 
-struct VulkanDevice {
-	VkPhysicalDevice physicalDevice;
-	VkDevice logicalDevice;
-};
-
 class VulkanRenderer
 {
 public:
@@ -112,7 +107,7 @@ public:
 	// Create Functions
 	VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 	VkShaderModule createShaderModule(const std::vector<char>& code);
-	VkImage createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory, VkSampleCountFlagBits numSamples);
+	VkImage createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory, VkSampleCountFlagBits numSamples);
 
 	int createTextureImage(std::string fileName);
 	int createTexture(std::string fileName);
@@ -132,6 +127,8 @@ public:
 private:
 	Window* window;
 	Camera* camera;
+
+	uint32_t mipLevels;
 
 	int currentFrame = 0;
 	bool frameBufferResized = false;
