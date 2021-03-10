@@ -49,11 +49,12 @@ public:
 	void createSurface();
 	void createSwapChain();
 	void createDepthBufferImage();
-	void createRenderPass();
+	void createRenderPass(VkRenderPass* theRenderPass);
 	void createDescriptorSetLayout();
 	void createPushConstantRange();
 	void createGraphicsPipeline();
 	void createFrameBuffers();
+	void CreateOffscreenFrameBuffer();
 	void createCommandPool();
 	void createCommandBuffers();
 	void createSynchronisation();
@@ -163,6 +164,8 @@ private:
 	VkImage colourImage;
 	VkDeviceMemory colourImageMemory;
 	VkImageView colourImageView;
+	// Multisample count
+	VkSampleCountFlagBits msaaSamples;
 
 	VkSampler textureSampler;
 
@@ -175,13 +178,23 @@ private:
 	std::vector<MeshModel> modelList;
 	std::vector<Mesh> meshList;
 
-	// Multisample count
-	VkSampleCountFlagBits msaaSamples;
-
 	// Pipeline
 	VkPipelineLayout pipelineLayout;
 	VkRenderPass renderPass;
 	VkPipeline graphicsPipeline;
+
+
+	// Shadowmap
+	uint32_t shadowWidth = 2048;
+	uint32_t shadowHeight = 2048;
+	// Offscreen Pipeline (for shadows)
+	VkFramebuffer offscreenFrameBuffer;
+	VkImage offscreenDepthImage;
+	VkDeviceMemory offscreenDepthImageMemory;
+	VkImageView offscreenDepthImageView;
+	VkRenderPass offscreenRenderPass;
+	VkSampler offscreenDepthSampler;
+	VkDescriptorImageInfo offscreenDescriptor;
 
 	// Pools
 	VkCommandPool graphicsCommandPool;

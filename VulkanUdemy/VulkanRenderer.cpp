@@ -22,11 +22,13 @@ int VulkanRenderer::init(Window* newWindow, Camera* newCamera)
 		createSwapChain();
 		createDepthBufferImage();
 		createColourImage();
-		createRenderPass();
+		createRenderPass(&offscreenRenderPass);
+		createRenderPass(&renderPass);
 		createDescriptorSetLayout();
 		createPushConstantRange();
 		createGraphicsPipeline();
 		createFrameBuffers();
+		CreateOffscreenFrameBuffer();
 		createCommandPool();
 		allocateDynamicBufferTransferSpace();
 		createUniformBuffers();
@@ -61,7 +63,7 @@ void VulkanRenderer::recreateSwapChain()
 	createSwapChain();
 	createDepthBufferImage();
 	createColourImage();
-	createRenderPass();
+	createRenderPass(&renderPass);
 	createGraphicsPipeline();
 	createFrameBuffers();
 	createCommandBuffers();
@@ -797,7 +799,7 @@ void VulkanRenderer::createSwapChain()
 	}
 }
 
-void VulkanRenderer::createRenderPass()
+void VulkanRenderer::createRenderPass(VkRenderPass* theRenderPass)
 {
 	VkAttachmentDescription colorAttachment{};
 	colorAttachment.format = swapChainImageFormat;
@@ -866,7 +868,7 @@ void VulkanRenderer::createRenderPass()
 	renderPassInfo.dependencyCount = 1;
 	renderPassInfo.pDependencies = &dependency;
 
-	if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+	if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassInfo, nullptr, theRenderPass) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create render pass!");
 	}
 }
@@ -1085,6 +1087,92 @@ void VulkanRenderer::createDepthBufferImage()
 
 	// Create depth buffer image view
 	depthBufferImageView = createImageView(depthBufferImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+}
+
+void VulkanRenderer::CreateOffscreenFrameBuffer()
+{
+	VkImageCreateInfo image = {};
+	image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	// For shadow mapping we only need a depth attachment
+	image.imageType = VK_IMAGE_TYPE_2D;
+	image.extent.width = shadowWidth;
+	image.extent.height = shadowHeight;
+	image.extent.depth = 1;
+	image.mipLevels = 1;
+	image.arrayLayers = 1;
+	image.samples = VK_SAMPLE_COUNT_1_BIT;
+	image.tiling = VK_IMAGE_TILING_OPTIMAL;
+	image.format = VK_FORMAT_D16_UNORM;																// Depth stencil attachment
+	image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;		// We will sample directly from the depth attachment for the shadow mapping
+	VkResult result = vkCreateImage(mainDevice.logicalDevice, &image, nullptr, &offscreenDepthImage);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create depth image!");
+	}
+	VkMemoryRequirements memReqs;
+	vkGetImageMemoryRequirements(mainDevice.logicalDevice, offscreenDepthImage, &memReqs);
+
+	VkMemoryAllocateInfo memAlloc = {};
+	memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	memAlloc.allocationSize = memReqs.size;
+	memAlloc.memoryTypeIndex = findMemoryTypeIndex(mainDevice.physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+	result = vkAllocateMemory(mainDevice.logicalDevice, &memAlloc, nullptr, &offscreenDepthImageMemory);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate memory for depth image!");
+	}
+	vkBindImageMemory(mainDevice.logicalDevice, offscreenDepthImage, offscreenDepthImageMemory, 0);
+
+	VkImageViewCreateInfo depthStencilView = {};
+	depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	depthStencilView.format = VK_FORMAT_D16_UNORM;
+	depthStencilView.subresourceRange = {};
+	depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+	depthStencilView.subresourceRange.baseMipLevel = 0;
+	depthStencilView.subresourceRange.levelCount = 1;
+	depthStencilView.subresourceRange.baseArrayLayer = 0;
+	depthStencilView.subresourceRange.layerCount = 1;
+	depthStencilView.image = offscreenDepthImage;
+
+	result = vkCreateImageView(mainDevice.logicalDevice, &depthStencilView, nullptr, &offscreenDepthImageView);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create depth image view");
+	}
+
+	// Create sampler to sample from to depth attachment
+	// Used to sample in the fragment shader for shadowed rendering
+	VkSamplerCreateInfo sampler = {};
+	sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	sampler.magFilter = VK_FILTER_LINEAR;
+	sampler.minFilter = VK_FILTER_LINEAR;
+	sampler.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	sampler.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	sampler.addressModeV = sampler.addressModeU;
+	sampler.addressModeW = sampler.addressModeU;
+	sampler.mipLodBias = 0.0f;
+	sampler.maxAnisotropy = 1.0f;
+	sampler.minLod = 0.0f;
+	sampler.maxLod = 1.0f;
+	sampler.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+	result = vkCreateSampler(mainDevice.logicalDevice, &sampler, nullptr, &offscreenDepthSampler);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create depth sampler");
+	}
+
+	// Create frame buffer
+	VkFramebufferCreateInfo fbufCreateInfo = {};
+	fbufCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+	fbufCreateInfo.renderPass = offscreenRenderPass;
+	fbufCreateInfo.attachmentCount = 1;
+	fbufCreateInfo.pAttachments = &offscreenDepthImageView;
+	fbufCreateInfo.width = shadowWidth;
+	fbufCreateInfo.height = shadowHeight;
+	fbufCreateInfo.layers = 1;
+
+	result = vkCreateFramebuffer(mainDevice.logicalDevice, &fbufCreateInfo, nullptr, &offscreenFrameBuffer);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create offscreen framebuffer");
+	}
 }
 
 void VulkanRenderer::createFrameBuffers()
@@ -1430,6 +1518,7 @@ void VulkanRenderer::createDescriptorSets()
 	}
 }
 
+#define VK_LOD_CLAMP_NONE 1000.0f
 void VulkanRenderer::createTextureSampler()
 {
 	VkSamplerCreateInfo samplerCreateInfo = {};
@@ -1439,14 +1528,17 @@ void VulkanRenderer::createTextureSampler()
 	samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK; // Border beyond texture, only works for border clamp
-	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE; // Whether coords should be normalised between 0 and 1
-	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	samplerCreateInfo.mipLodBias = 0.0f; // Level of detail bias for mip level
-	samplerCreateInfo.minLod = 0.0f;
-	samplerCreateInfo.maxLod = static_cast<float>(mipLevels /2);
 	samplerCreateInfo.anisotropyEnable = VK_TRUE;
 	samplerCreateInfo.maxAnisotropy = 16; // Sample level of anisotropy
+	samplerCreateInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK; // Border beyond texture, only works for border clamp
+	samplerCreateInfo.unnormalizedCoordinates = VK_FALSE; // Whether coords should be normalised between 0 and 1
+	samplerCreateInfo.compareEnable = VK_FALSE;
+	samplerCreateInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerCreateInfo.minLod = static_cast<float>(10000.0f / 2);
+	samplerCreateInfo.maxLod = static_cast<float>(10000.0f);
+	samplerCreateInfo.mipLodBias = 0.0f; // Level of detail bias for mip level
+
 
 	VkResult result = vkCreateSampler(mainDevice.logicalDevice, &samplerCreateInfo, nullptr, &textureSampler);
 	if (result != VK_SUCCESS) {
@@ -1684,6 +1776,8 @@ int VulkanRenderer::createTextureImage(std::string fileName)
 	stbi_uc* imageData = loadTextureFile(fileName, &width, &height, &imageSize);
 
 	mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
+	std::cout << "mip levels " << mipLevels <<"\n";
 
 	// Create staging buffer to hold loaded data, ready to copy to device
 	VkBuffer imageStagingBuffer;
