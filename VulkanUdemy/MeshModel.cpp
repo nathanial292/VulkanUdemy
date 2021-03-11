@@ -1,125 +1,127 @@
 #include "MeshModel.h"
 
-MeshModel::MeshModel(std::vector<Mesh> newMeshList)
-{
-	meshList = newMeshList;
-	model = glm::mat4(1.0f);
-}
-
-MeshModel::~MeshModel()
-{
-}
-
-size_t MeshModel::getMeshCount()
-{
-	return meshList.size();
-}
-
-Mesh* MeshModel::getMesh(size_t index)
-{
-	if (index >= meshList.size()) {
-		throw std::runtime_error("Attempted to access invalid Mesh index");
+namespace vulkan {
+	MeshModel::MeshModel(std::vector<Mesh> newMeshList)
+	{
+		meshList = newMeshList;
+		model = glm::mat4(1.0f);
 	}
 
-	return &meshList[index];
-}
+	MeshModel::~MeshModel()
+	{
+	}
 
-glm::mat4 MeshModel::getModel()
-{
-	return model;
-}
+	size_t MeshModel::getMeshCount()
+	{
+		return meshList.size();
+	}
 
-void MeshModel::setModel(glm::mat4 newModel)
-{
-	model = newModel;
-}
+	Mesh* MeshModel::getMesh(size_t index)
+	{
+		if (index >= meshList.size()) {
+			throw std::runtime_error("Attempted to access invalid Mesh index");
+		}
 
-std::vector<std::string> MeshModel::LoadMaterials(const aiScene* scene)
-{
-	// Create 1:1 sized list of textures
-	std::vector<std::string> textureList(scene->mNumMaterials);
+		return &meshList[index];
+	}
 
-	// Go through each material and copy its texture file name (if it exists)
-	for (size_t i = 0; i < scene->mNumMaterials; i++) {
-		aiMaterial* material = scene->mMaterials[i]; // Get material
+	glm::mat4 MeshModel::getModel()
+	{
+		return model;
+	}
 
-		// Initalise the texture to empty string (will be replaced if texture exists)
-		textureList[i] = "";
-		// Check for a diffuse texture (standard detail texture)
-		if (material->GetTextureCount(aiTextureType_DIFFUSE)) {
-			// Get the path of the texture file
-			aiString path;
-			if (material->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS) {
-				// Cut off any directory information already present
-				int index = std::string(path.data).rfind("\\"); // Find the position of the last backslash in the string (e.g. C:\users\Ben\Documents\thing.obj
-				std::string fileName = std::string(path.data).substr(index + 1); // Get the "thing.obj" (+1 from the backslash)
+	void MeshModel::setModel(glm::mat4 newModel)
+	{
+		model = newModel;
+	}
 
-				textureList[i] = fileName;
+	std::vector<std::string> MeshModel::LoadMaterials(const aiScene* scene)
+	{
+		// Create 1:1 sized list of textures
+		std::vector<std::string> textureList(scene->mNumMaterials);
+
+		// Go through each material and copy its texture file name (if it exists)
+		for (size_t i = 0; i < scene->mNumMaterials; i++) {
+			aiMaterial* material = scene->mMaterials[i]; // Get material
+
+			// Initalise the texture to empty string (will be replaced if texture exists)
+			textureList[i] = "";
+			// Check for a diffuse texture (standard detail texture)
+			if (material->GetTextureCount(aiTextureType_DIFFUSE)) {
+				// Get the path of the texture file
+				aiString path;
+				if (material->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS) {
+					// Cut off any directory information already present
+					int index = std::string(path.data).rfind("\\"); // Find the position of the last backslash in the string (e.g. C:\users\Ben\Documents\thing.obj
+					std::string fileName = std::string(path.data).substr(index + 1); // Get the "thing.obj" (+1 from the backslash)
+
+					textureList[i] = fileName;
+				}
 			}
 		}
-	}
-	return textureList;
-}
-
-std::vector<Mesh> MeshModel::LoadNode(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, aiNode* node, const aiScene* scene, std::vector<int> matToTex)
-{
-	std::vector<Mesh> meshList;
-	// Go through each mesh at this node and create it, then add it to our meshList
-	for (size_t i = 0; i < node->mNumMeshes; i++) {
-		meshList.push_back(LoadMesh(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, scene->mMeshes[node->mMeshes[i]], scene, matToTex));
+		return textureList;
 	}
 
-	// Go through each node attached to this node and load it, then append their meshes to this nodes mesh list
-	for (size_t i = 0; i < node->mNumChildren; i++) {
-		std::vector<Mesh> newList = LoadNode(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, node->mChildren[i], scene, matToTex);
-		meshList.insert(meshList.end(), newList.begin(), newList.end()); // Insert at the end of meshlist, all nodes from the start to end of newList (child node)
-	}
-
-	return meshList;
-}
-
-Mesh MeshModel::LoadMesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, aiMesh* mesh, const aiScene* scene, std::vector<int> matToTex)
-{
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-
-	vertices.resize(mesh->mNumVertices);
-	for (size_t i = 0; i < mesh->mNumVertices; i++) {
-		// Set position
-		vertices[i].pos = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
-		
-		// Set texture coords if they exist
-		if (mesh->mTextureCoords[0]) {
-			vertices[i].tex = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+	std::vector<Mesh> MeshModel::LoadNode(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, aiNode* node, const aiScene* scene, std::vector<int> matToTex)
+	{
+		std::vector<Mesh> meshList;
+		// Go through each mesh at this node and create it, then add it to our meshList
+		for (size_t i = 0; i < node->mNumMeshes; i++) {
+			meshList.push_back(LoadMesh(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, scene->mMeshes[node->mMeshes[i]], scene, matToTex));
 		}
-		else {
-			vertices[i].tex = { 0.0f, 0.0f };
-		}
-		vertices[i].col = { 1.0f, 1.0f, 1.0f };
-		vertices[i].normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-		//calcAverageNormals(&indices, &vertices);
 
-		//std::cout << vertices[i].normal.x << " " << vertices[i].normal.y << " " << vertices[i].normal.z;
+		// Go through each node attached to this node and load it, then append their meshes to this nodes mesh list
+		for (size_t i = 0; i < node->mNumChildren; i++) {
+			std::vector<Mesh> newList = LoadNode(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, node->mChildren[i], scene, matToTex);
+			meshList.insert(meshList.end(), newList.begin(), newList.end()); // Insert at the end of meshlist, all nodes from the start to end of newList (child node)
+		}
+
+		return meshList;
 	}
 
-	// Go through faces indicies and add to list
-	for (size_t i = 0; i < mesh->mNumFaces; i++) {
-		// Get face
-		aiFace face = mesh->mFaces[i];
-		for (size_t j = 0; j < face.mNumIndices; j++) {
-			indices.push_back(face.mIndices[j]);
+	Mesh MeshModel::LoadMesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, aiMesh* mesh, const aiScene* scene, std::vector<int> matToTex)
+	{
+		std::vector<Vertex> vertices;
+		std::vector<uint32_t> indices;
+
+		vertices.resize(mesh->mNumVertices);
+		for (size_t i = 0; i < mesh->mNumVertices; i++) {
+			// Set position
+			vertices[i].pos = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
+
+			// Set texture coords if they exist
+			if (mesh->mTextureCoords[0]) {
+				vertices[i].tex = { mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y };
+			}
+			else {
+				vertices[i].tex = { 0.0f, 0.0f };
+			}
+			vertices[i].col = { 1.0f, 1.0f, 1.0f };
+			vertices[i].normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
+			//calcAverageNormals(&indices, &vertices);
+
+			//std::cout << vertices[i].normal.x << " " << vertices[i].normal.y << " " << vertices[i].normal.z;
 		}
+
+		// Go through faces indicies and add to list
+		for (size_t i = 0; i < mesh->mNumFaces; i++) {
+			// Get face
+			aiFace face = mesh->mFaces[i];
+			for (size_t j = 0; j < face.mNumIndices; j++) {
+				indices.push_back(face.mIndices[j]);
+			}
+		}
+
+		// Create new mesh with details and return
+		Mesh newMesh = Mesh(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, &indices, &vertices, matToTex[mesh->mMaterialIndex]);
+
+		return newMesh;
 	}
 
-	// Create new mesh with details and return
-	Mesh newMesh = Mesh(newPhysicalDevice, newDevice, transferQueue, transferCommandPool, &indices, &vertices, matToTex[mesh->mMaterialIndex]);
-
-	return newMesh;
-}
-
-void MeshModel::destroyMeshModel()
-{
-	for (auto& mesh : meshList) {
-		mesh.destroyBuffers();
+	void MeshModel::destroyMeshModel()
+	{
+		for (auto& mesh : meshList) {
+			mesh.destroyBuffers();
+		}
 	}
 }

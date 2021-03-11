@@ -5,60 +5,61 @@
 #include <vector>
 #include "Utilities.h"
 
-struct Model {
-	glm::mat4 model;
-	bool hasTexture;
-};
+namespace vulkan {
+	struct Model {
+		glm::mat4 model;
+		bool hasTexture;
+	};
 
-class Mesh
-{
-public:
-	Mesh();
-	Mesh(VkPhysicalDevice newPhysicalDevice, 
-		VkDevice newDevice, 
-		VkQueue transferQueue, 
-		VkCommandPool transferCommandPool,
-		std::vector<uint32_t> * indices, 
-		std::vector<Vertex> * vertices,
-		int newTexId);
+	class Mesh
+	{
+	public:
+		Mesh();
+		Mesh(VkPhysicalDevice newPhysicalDevice,
+			VkDevice newDevice,
+			VkQueue transferQueue,
+			VkCommandPool transferCommandPool,
+			std::vector<uint32_t>* indices,
+			std::vector<Vertex>* vertices,
+			int newTexId);
 
-	Mesh(VkPhysicalDevice newPhysicalDevice,
-		VkDevice newDevice,
-		VkQueue transferQueue,
-		VkCommandPool transferCommandPool,
-		std::vector<uint32_t>* indices,
-		std::vector<Vertex>* vertices);
-	
-	int getTexId();
+		Mesh(VkPhysicalDevice newPhysicalDevice,
+			VkDevice newDevice,
+			VkQueue transferQueue,
+			VkCommandPool transferCommandPool,
+			std::vector<uint32_t>* indices,
+			std::vector<Vertex>* vertices);
 
-	int getVertexCount();
-	VkBuffer getVertexBuffer();
+		int getTexId();
 
-	int getIndexCount();
-	VkBuffer getIndexBuffer();
+		int getVertexCount();
+		VkBuffer getVertexBuffer();
 
-	void destroyBuffers();
+		int getIndexCount();
+		VkBuffer getIndexBuffer();
 
-	void setModel(glm::mat4 newModel);
-	Model getModel();
+		void destroyBuffers();
 
-	~Mesh();
-private:
-	Model model;
-	int texId;
+		void setModel(glm::mat4 newModel);
+		Model getModel();
 
-	int vertexCount;
-	VkBuffer vertexBuffer;
-	VkDeviceMemory vertexBufferMemory;
+		~Mesh();
+	private:
+		Model model;
+		int texId;
 
-	int indexCount;
-	VkBuffer indexBuffer;
-	VkDeviceMemory indexBufferMemory;
+		int vertexCount;
+		VkBuffer vertexBuffer;
+		VkDeviceMemory vertexBufferMemory;
 
-	VkPhysicalDevice physicalDevice;
-	VkDevice device;
+		int indexCount;
+		VkBuffer indexBuffer;
+		VkDeviceMemory indexBufferMemory;
 
-	void createVertexBuffer(VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<Vertex>* vertices);
-	void createIndexBuffer(VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<uint32_t>* indices);
-};
+		VkPhysicalDevice physicalDevice;
+		VkDevice device;
 
+		void createVertexBuffer(VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<Vertex>* vertices);
+		void createIndexBuffer(VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<uint32_t>* indices);
+	};
+}

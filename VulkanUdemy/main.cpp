@@ -1,3 +1,6 @@
+/*
+
+
 #define STB_IMAGE_IMPLEMENTATION
 #define GLFW_INCLUDE_VULKAN
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -207,3 +210,4 @@ private:
 int main() {
 	Main main;
 }
+*/

@@ -1,30 +1,31 @@
 #pragma once
 #include "Light.h"
 
-struct UniformLight {
-    glm::vec3 colour;
-    glm::vec3 direction;
-    float ambientIntensity;
-    float diffuseIntensity;
-};
+namespace vulkan {
+    struct UniformLight {
+        glm::vec3 colour;
+        glm::vec3 direction;
+        float ambientIntensity;
+        float diffuseIntensity;
+    };
 
-class DirectionalLight :
-    public Light
-{
-public:
-    DirectionalLight();
+    class DirectionalLight :
+        public Light
+    {
+    public:
+        DirectionalLight();
 
-    DirectionalLight(float red, float green, float blue,
-        float aIntensity, float dIntensity,
-        float xDir, float yDir, float zDir);
+        DirectionalLight(float red, float green, float blue,
+            float aIntensity, float dIntensity,
+            float xDir, float yDir, float zDir);
 
-    UniformLight getLight();
+        UniformLight getLight();
 
-    void UpdatePosition(float xDir, float yDir, float zDir);
+        void UpdatePosition(float xDir, float yDir, float zDir);
 
-    ~DirectionalLight();
+        ~DirectionalLight();
 
-private:
-    glm::vec3 direction;
-};
-
+    private:
+        glm::vec3 direction;
+    };
+}
