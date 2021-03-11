@@ -54,12 +54,13 @@ public:
 	void createPushConstantRange();
 	void createGraphicsPipeline();
 	void createFrameBuffers();
-	void CreateOffscreenFrameBuffer();
+	void createOffscreenFrameBuffer();
 	void createCommandPool();
 	void createCommandBuffers();
 	void createSynchronisation();
 	void createUniformBuffers();
 	void createDescriptorPool();
+	void createShadowSamplerDescriptorSet();
 	void createDescriptorSets();
 	void createTextureSampler();
 
@@ -212,13 +213,16 @@ private:
 	// Descriptors
 	VkDescriptorSetLayout descriptorSetLayout;
 	VkDescriptorSetLayout samplerSetLayout;
+	VkDescriptorSetLayout shadowSamplerSetLayout;
 
 	VkPushConstantRange pushConstantRange;
 
 	VkDescriptorPool descriptorPool;
 	VkDescriptorPool samplerDescriptorPool;
+	VkDescriptorPool shadowSamplerDescriptorPool;
 	std::vector<VkDescriptorSet> descriptorSets;
 	std::vector<VkDescriptorSet> samplerDescriptorSets;
+	VkDescriptorSet shadowSamplerDescriptorSet;
 
 	// Uniform Buffers (Static for every model)
 	std::vector<VkBuffer> vpUniformBuffer;

@@ -28,7 +28,7 @@ int VulkanRenderer::init(Window* newWindow, Camera* newCamera)
 		createPushConstantRange();
 		createGraphicsPipeline();
 		createFrameBuffers();
-		CreateOffscreenFrameBuffer();
+		createOffscreenFrameBuffer();
 		createCommandPool();
 		allocateDynamicBufferTransferSpace();
 		createUniformBuffers();
@@ -1089,7 +1089,7 @@ void VulkanRenderer::createDepthBufferImage()
 	depthBufferImageView = createImageView(depthBufferImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
-void VulkanRenderer::CreateOffscreenFrameBuffer()
+void VulkanRenderer::createOffscreenFrameBuffer()
 {
 	VkImageCreateInfo image = {};
 	image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1324,6 +1324,24 @@ void VulkanRenderer::createDescriptorSetLayout()
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create a sampler descriptor set layout!");
 	}
+
+	// SHADOW SAMPLER DESCRIPTOR SET LAYOUT
+	VkDescriptorSetLayoutBinding shadowLayoutBinding = {};
+	shadowLayoutBinding.binding = 0;
+	shadowLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	shadowLayoutBinding.descriptorCount = 1;
+	shadowLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+	shadowLayoutBinding.pImmutableSamplers = nullptr;
+
+	VkDescriptorSetLayoutCreateInfo shadowLayoutCreateInfo = {};
+	shadowLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	shadowLayoutCreateInfo.bindingCount = 1;
+	shadowLayoutCreateInfo.pBindings = &shadowLayoutBinding;
+
+	result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &shadowLayoutCreateInfo, nullptr, &shadowSamplerSetLayout);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create the shadow sampler descriptor set layout!");
+	}
 }
 
 void VulkanRenderer::createPushConstantRange()
@@ -1420,6 +1438,22 @@ void VulkanRenderer::createDescriptorPool()
 	if (result != VK_SUCCESS) {
 		throw std::runtime_error("Failed to create a sampler descriptor pool!");
 	}
+
+	// SHADOW SAMPLER POOL
+	VkDescriptorPoolSize shadowSamplerPoolSize = {};
+	shadowSamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	shadowSamplerPoolSize.descriptorCount = 1;
+
+	VkDescriptorPoolCreateInfo shadowSamplerPoolCreateInfo = {};
+	samplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+	samplerPoolCreateInfo.maxSets = 1;
+	samplerPoolCreateInfo.poolSizeCount = 1;
+	samplerPoolCreateInfo.pPoolSizes = &shadowSamplerPoolSize;
+
+	result = vkCreateDescriptorPool(mainDevice.logicalDevice, &samplerPoolCreateInfo, nullptr, &shadowSamplerDescriptorPool);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to create the shadow sampler descriptor pool!");
+	}
 }
 
 void VulkanRenderer::createDescriptorSets()
@@ -1493,7 +1527,6 @@ void VulkanRenderer::createDescriptorSets()
 		lightSetWrite.descriptorCount = 1;
 		lightSetWrite.pBufferInfo = &lightBufferInfo; // Information about buffer data to bind
 
-
 		// CAMERA LIGHT UNIFORM DESCRIPTOR
 		// Buffer info and data offset info
 		VkDescriptorBufferInfo cameraPositionInfo = {};
@@ -1511,11 +1544,54 @@ void VulkanRenderer::createDescriptorSets()
 		cameraPositionSetWrite.descriptorCount = 1;
 		cameraPositionSetWrite.pBufferInfo = &cameraPositionInfo; // Information about buffer data to bind
 
-		std::vector<VkWriteDescriptorSet> setWrites = { vpSetWrite, modelSetWrite, lightSetWrite, cameraPositionSetWrite };
+		// Shadow image info
+		VkDescriptorImageInfo imageInfo = {};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL; // Image layout when in use
+		imageInfo.imageView = offscreenDepthImageView; // Image to bind to set
+		imageInfo.sampler = offscreenDepthSampler; // Sampler to use for set
+
+		// Shadow Write Info
+		VkWriteDescriptorSet shadowSamplerSetWrite = {};
+		shadowSamplerSetWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		shadowSamplerSetWrite.dstSet = descriptorSets[i];
+		shadowSamplerSetWrite.dstBinding = 4;
+		shadowSamplerSetWrite.dstArrayElement = 0;
+		shadowSamplerSetWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		shadowSamplerSetWrite.descriptorCount = 1;
+		shadowSamplerSetWrite.pImageInfo = &imageInfo;
+
+		std::vector<VkWriteDescriptorSet> setWrites = { vpSetWrite, modelSetWrite, lightSetWrite, cameraPositionSetWrite, shadowSamplerSetWrite };
 
 		// Update the descriptor sets with new buffer binding info
 		vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(setWrites.size()), setWrites.data(), 0, nullptr);
 	}
+}
+
+void VulkanRenderer::createShadowSamplerDescriptorSet() {
+	// SHADOW SAMPLER DESCRIPTOR SET
+	// Descriptor Set Allocation Info
+	VkDescriptorSetAllocateInfo setAllocInfo = {};
+	setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	setAllocInfo.descriptorPool = shadowSamplerDescriptorPool;
+	setAllocInfo.descriptorSetCount = 1;
+	setAllocInfo.pSetLayouts = &shadowSamplerSetLayout;
+
+	VkResult result = vkAllocateDescriptorSets(mainDevice.logicalDevice, &setAllocInfo, &shadowSamplerDescriptorSet);
+	if (result != VK_SUCCESS) {
+		throw std::runtime_error("Failed to allocate shadow sampler descriptor set");
+	}
+
+	// Descriptor Write Info
+	VkWriteDescriptorSet descriptorWrite = {};
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.dstSet = shadowSamplerDescriptorSet;
+	descriptorWrite.dstBinding = 0;
+	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	descriptorWrite.descriptorCount = 1;
+	descriptorWrite.pImageInfo = &offscreenDescriptor;
+	// Update new descriptor set
+	vkUpdateDescriptorSets(mainDevice.logicalDevice, 1, &descriptorWrite, 0, nullptr);
 }
 
 #define VK_LOD_CLAMP_NONE 1000.0f
