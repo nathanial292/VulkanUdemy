@@ -31,14 +31,14 @@ public:
 		// Start Pos (x,y,z)
 		// Start Up (x,y,z)
 		// GLfloat startYaw, GLfloat startPitch, GLfloat startMoveSpeed, GLfloat startTurnSpeed
-		camera = new Camera(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, -10.0f, 5.0f, 0.05f);
+		camera = new Camera(glm::vec3(0.0f, 5.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), -90.0f, -10.0f, 5.0f, 0.05f);
 #		// Create window
 		theWindow = new Window();
 		theWindow->Initialise();
 
 		light = DirectionalLight(1.0f, 1.0f, 1.0f,
 			0.05f, 0.5f,
-			8.0f, 10.0f, 8.0f);
+			8.0f, 20.0f, 8.0f);
 
 		// Create VulkanRenderer Instance
 		if (vulkanRenderer.init(theWindow, camera) == EXIT_FAILURE)
@@ -64,16 +64,22 @@ public:
 			deltaTime = now - lastTime;
 			lastTime = now;
 
-			angle += 10.0f * deltaTime;
+			angle += 30.0f * deltaTime;
 			if (angle > 360.0f) angle = 0.0f;
 
 			glm::mat4 firstModel(1.0f);
-			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
+
+
+			firstModel = glm::scale(firstModel, glm::vec3(6.0f, 6.0f, 6.0f));
+			firstModel = glm::translate(firstModel, glm::vec3(-1.5f, 0.1f, 1.0f));
+			//firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(0.0f, 1.0f, 0.0f));
+			firstModel = glm::rotate(firstModel, glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+			
 			vulkanRenderer.updateModel(0, firstModel);
 
 			firstModel = glm::mat4(1.0f); // Identity matrix
-			firstModel = glm::translate(firstModel, glm::vec3(0.0f, 2.0f, -4.0f));
-			firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
+			firstModel = glm::translate(firstModel, glm::vec3(0.0f, 2.0f, -2.0f));
+			//firstModel = glm::rotate(firstModel, glm::radians(angle), glm::vec3(-0.0f, -1.0f, 0.0f));
 			vulkanRenderer.updateModelMesh(1, firstModel);
 
 			vulkanRenderer.draw();
@@ -92,7 +98,6 @@ public:
 			{ { -2, -0.1, -2.0 },{ 0.0f, 1.0f, 0.0f }, {1.0f, 0.0f}, { 0.0f, 0.0f, 0.0f } }, // 1
 			{ { 2, -0.1, -2.0 },{ 0.0f, 0.0f, 1.0f }, {0.0f, 0.0f}, { 0.0f, 0.0f, 0.0f } }, // 2
 			{ { 2, 2, -2.0 },{ 1.0f, 1.0f, 0.0f }, {0.0f, 1.0f}, { 0.0f, 0.0f, 0.0f } } // 3
-
 		};
 
 		// Index data
@@ -102,7 +107,6 @@ public:
 		};
 
 		std::vector<Vertex> meshVertices = {
-
 			{ { -1.0, -1.0, 1.0 }, { 1.0, 1.0, 1.0 }, { 0.0, 0.0 }, { 0.0, 0.0, 0.0 }}, // 0
 			{ { 1.0, -1.0, 1.0 }, { 1.0, 1.0, 1.0 }, { 1.0, 0.0 }, { 0.0, 0.0, 0.0 }},
 			{ { -1.0, 1.0, 1.0 }, { 1.0, 1.0, 1.0 }, { 0.0, 1.0 }, { 0.0, 0.0, 0.0 }},
@@ -183,8 +187,9 @@ public:
 		meshList.push_back(firstMesh);
 		meshList.push_back(secondMesh);
 
-		MeshModel meshModel = vulkanRenderer.createMeshModel("models/chair_01.obj", vulkanRenderer.createTexture("wood.png"));
-		modelList.push_back(meshModel);
+		MeshModel meshModel1 = vulkanRenderer.createMeshModel("models/viking_room.obj", vulkanRenderer.createTexture("viking_room.png"));
+		//MeshModel meshModel1 = vulkanRenderer.createMeshModel("models/chair_01.obj", vulkanRenderer.createTexture("cottage_diffuse.png"));
+		modelList.push_back(meshModel1);
 
 		for (size_t i = 0; i <= MAX_FRAME_DRAWS; ++i) {
 			vulkanRenderer.updateUniformBuffers(i);

@@ -60,6 +60,7 @@ namespace vulkan {
 		cleanupSwapChain();
 		createSwapChain();
 		createDepthBufferImage();
+		createColourImage();
 		createRenderPass();
 		createGraphicsPipeline();
 		createFrameBuffers();
@@ -77,9 +78,26 @@ namespace vulkan {
 			vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
 		}
 
-		vkDestroyDescriptorPool(mainDevice.logicalDevice, samplerDescriptorPool, nullptr);
-		vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, samplerSetLayout, nullptr);
-		vkDestroySampler(mainDevice.logicalDevice, textureSampler, nullptr);
+	cleanupSwapChain();
+	createSwapChain();
+	createDepthBufferImage();
+	createColourImage();
+	createRenderPass();
+	createGraphicsPipeline();
+	createFrameBuffers();
+	createCommandBuffers();
+}
+
+void VulkanRenderer::cleanup()
+{
+	// Clean up all components of the swapchain, render pass, graphics pipeline, command buffers, image views
+	cleanupSwapChain();
+
+	for (size_t i = 0; i < textureImages.size(); i++) {
+		vkDestroyImage(mainDevice.logicalDevice, textureImages[i], nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, textureImageMemory[i], nullptr);
+		vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
+	}
 
 		for (size_t i = 0; i < modelList.size(); i++) {
 			modelList[i].destroyMeshModel();
@@ -137,6 +155,11 @@ namespace vulkan {
 		vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView, nullptr);
 		vkDestroyImage(mainDevice.logicalDevice, depthBufferImage, nullptr);
 		vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory, nullptr);
+
+		// Cleanup for colour buffer
+		vkDestroyImageView(mainDevice.logicalDevice, colourImageView, nullptr);
+		vkDestroyImage(mainDevice.logicalDevice, colourImage, nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, colourImageMemory, nullptr);
 
 		for (auto image : swapChainImages) {
 			//vkDestroyImage(mainDevice.logicalDevice, image.image, nullptr);
@@ -412,6 +435,8 @@ namespace vulkan {
 			if (checkDeviceSuitable(device))
 			{
 				mainDevice.physicalDevice = device;
+				msaaSamples = getMaxUseableSampleCount();
+				//msaaSamples = VK_SAMPLE_COUNT_1_BIT;
 				break;
 			}
 		}
@@ -784,24 +809,19 @@ namespace vulkan {
 
 	void VulkanRenderer::createRenderPass()
 	{
-		// ATTACHMENTS
-		// Color Attachment of render pass
-		VkAttachmentDescription colorAttachment = {};
-		colorAttachment.format = swapChainImageFormat; // Format to use for attachment 
-		colorAttachment.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples to write for multisampling
-		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR; // Describes what to do with attachment before rendering
-		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // What to do with attachment after rendering
-		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // Describes what to do with stencil before rendering
-		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE; // Describes what to do with stencil after rendering
+		VkAttachmentDescription colorAttachment{};
+		colorAttachment.format = swapChainImageFormat;
+		colorAttachment.samples = msaaSamples;
+		colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-		// Framebuffer data will be stored as an image, but images can be given different layouts
-		// to give optimal use for certain operations
-		colorAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Image data layout before render pass starts
-		colorAttachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR; // Image data layout after render pass (to change to)
-
-		VkAttachmentDescription depthAttachment = {};
+		VkAttachmentDescription depthAttachment{};
 		depthAttachment.format = depthBufferFormat;
-		depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		depthAttachment.samples = msaaSamples;
 		depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -809,64 +829,55 @@ namespace vulkan {
 		depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-		// REFERENCES
-		// Attachment reference uses an attachment index that refers to the attachment list passed to renderPassCreateInfo
-		VkAttachmentReference colorAttachmentReference = {};
-		colorAttachmentReference.attachment = 0; // Use the first attachment in the list passed to renderPassCreateInfo
-		colorAttachmentReference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		VkAttachmentDescription colorAttachmentResolve{};
+		colorAttachmentResolve.format = swapChainImageFormat;
+		colorAttachmentResolve.samples = VK_SAMPLE_COUNT_1_BIT;
+		colorAttachmentResolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachmentResolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
-		// Attachment for the depth stencil
-		VkAttachmentReference depthAttachmentReference = {};
-		depthAttachmentReference.attachment = 1; // At index 1 of our attachments
-		depthAttachmentReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		VkAttachmentReference colorAttachmentRef{};
+		colorAttachmentRef.attachment = 0;
+		colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+		VkAttachmentReference depthAttachmentRef{};
+		depthAttachmentRef.attachment = 1;
+		depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
-		// Information about a particular subpass the render pass is using
-		VkSubpassDescription subpass = {};
+		VkAttachmentReference colorAttachmentResolveRef{};
+		colorAttachmentResolveRef.attachment = 2;
+		colorAttachmentResolveRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		VkSubpassDescription subpass{};
 		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		subpass.colorAttachmentCount = 1;
-		subpass.pColorAttachments = &colorAttachmentReference;
-		subpass.pDepthStencilAttachment = &depthAttachmentReference;
+		subpass.pColorAttachments = &colorAttachmentRef;
+		subpass.pDepthStencilAttachment = &depthAttachmentRef;
+		subpass.pResolveAttachments = &colorAttachmentResolveRef;
 
-		// Need to determine when layout transitions occur using subpass dependencies
-		std::array<VkSubpassDependency, 2> subpassDependencies;
+		VkSubpassDependency dependency{};
+		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependency.dstSubpass = 0;
+		dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		dependency.srcAccessMask = 0;
+		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-		// Conversion from  VK_IMAGE_LAYOUT_UNDEFINED to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		// Transiton must happen after
-		subpassDependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL; // Subpss Index (VK_SUBPASS_EXTERNAL = Special value meaning outside of renderpass)
-		subpassDependencies[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT; // Pipeline stage
-		subpassDependencies[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT; // Stage access mask (memory access)
-		// But must happen after...
-		subpassDependencies[0].dstSubpass = 0;
-		subpassDependencies[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		subpassDependencies[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		subpassDependencies[0].dependencyFlags = 0;
+		std::array<VkAttachmentDescription, 3> attachments = { colorAttachment, depthAttachment, colorAttachmentResolve };
+		VkRenderPassCreateInfo renderPassInfo{};
+		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+		renderPassInfo.pAttachments = attachments.data();
+		renderPassInfo.subpassCount = 1;
+		renderPassInfo.pSubpasses = &subpass;
+		renderPassInfo.dependencyCount = 1;
+		renderPassInfo.pDependencies = &dependency;
 
-		// Conversion from  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL to VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		// Transiton must happen after
-		subpassDependencies[1].srcSubpass = 0;
-		subpassDependencies[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		subpassDependencies[1].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-		// But must happen after...
-		subpassDependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-		subpassDependencies[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-		subpassDependencies[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-		subpassDependencies[1].dependencyFlags = 0;
-
-		std::array<VkAttachmentDescription, 2> renderPassAttachments = { colorAttachment, depthAttachment };
-
-		VkRenderPassCreateInfo renderPassCreateInfo = {};
-		renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		renderPassCreateInfo.attachmentCount = static_cast<uint32_t>(renderPassAttachments.size());
-		renderPassCreateInfo.pAttachments = renderPassAttachments.data();
-		renderPassCreateInfo.subpassCount = 1;
-		renderPassCreateInfo.pSubpasses = &subpass;
-		renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(subpassDependencies.size());
-		renderPassCreateInfo.pDependencies = subpassDependencies.data();
-
-		VkResult result = vkCreateRenderPass(mainDevice.logicalDevice, &renderPassCreateInfo, nullptr, &renderPass);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create render pass");
+		if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create render pass!");
 		}
 	}
 
@@ -1450,7 +1461,7 @@ namespace vulkan {
 		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		samplerCreateInfo.mipLodBias = 0.0f; // Level of detail bias for mip level
 		samplerCreateInfo.minLod = 0.0f;
-		samplerCreateInfo.maxLod = 0.0f;
+		samplerCreateInfo.maxLod = static_cast<float>(mipLevels /2);
 		samplerCreateInfo.anisotropyEnable = VK_TRUE;
 		samplerCreateInfo.maxAnisotropy = 16; // Sample level of anisotropy
 
@@ -1458,7 +1469,6 @@ namespace vulkan {
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create sampler");
 		}
-
 	}
 
 	void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
@@ -1632,7 +1642,7 @@ namespace vulkan {
 		return shaderModule;
 	}
 
-	VkImage VulkanRenderer::createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory)
+	VkImage VulkanRenderer::createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory, VkSampleCountFlagBits numSamples)
 	{
 		// CREATE IMAGE
 		VkImageCreateInfo imageCreateInfo = {};
@@ -1641,7 +1651,7 @@ namespace vulkan {
 		imageCreateInfo.extent.width = width;
 		imageCreateInfo.extent.height = height;
 		imageCreateInfo.extent.depth = 1; // Depth of image (just 1, no 3D aspect)
-		imageCreateInfo.mipLevels = 1; // Number of mipmap levels
+		imageCreateInfo.mipLevels = mipLevels; // Number of mipmap levels
 		imageCreateInfo.arrayLayers = 1; // Number of levels in image array
 		imageCreateInfo.format = format; // Format type of image (depth format, colour etc)
 		imageCreateInfo.tiling = tiling; // How image data should be tiled, (arranged for optimal reading)
@@ -1649,6 +1659,8 @@ namespace vulkan {
 		imageCreateInfo.usage = useFlags; // Being used as a depth buffer attachment (Bit flag defining what image will be used for)
 		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multisamples
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
+		imageCreateInfo.samples = numSamples;
+
 
 		VkImage image;
 		VkResult result = vkCreateImage(mainDevice.logicalDevice, &imageCreateInfo, nullptr, &image);
@@ -1686,6 +1698,8 @@ namespace vulkan {
 		VkDeviceSize imageSize;
 		stbi_uc* imageData = loadTextureFile(fileName, &width, &height, &imageSize);
 
+		mipLevels = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
+
 		// Create staging buffer to hold loaded data, ready to copy to device
 		VkBuffer imageStagingBuffer;
 		VkDeviceMemory imageStagingBufferMemory;
@@ -1704,16 +1718,18 @@ namespace vulkan {
 		// Create image to hold final texture
 		VkImage texImage;
 		VkDeviceMemory texImageMemory;
-		texImage = createImage(width, height, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texImageMemory);
+		texImage = createImage(width, height, mipLevels, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &texImageMemory, VK_SAMPLE_COUNT_1_BIT);
 
 		// Transition image to be DST for copy operation
-		transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, texImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+		transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, texImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
 
 		// Copy data to image (Staging buffer to texImage)
 		copyImageBuffer(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, imageStagingBuffer, texImage, width, height);
 
 		// Transition image to be shader readable for shader usage
-		transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, mipLevels);
+
+		generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, texImage, VK_FORMAT_R8G8B8A8_SRGB, width, height, mipLevels);
 
 		// Add texture data to vector for reference
 		textureImages.push_back(texImage);
@@ -1796,7 +1812,11 @@ namespace vulkan {
 		// Conversion from materials list IDs to our descriptor array IDs
 		std::vector<int> matToTex(textureNames.size());
 
+		std::cout << textureNames.size();
+
 		for (size_t i = 0; i < textureNames.size(); i++) {
+			
+			std::cout << textureNames[i] << " " << i <<"\n";
 			// If material has no texture, set 0 to indicate no texture. texture 0 will be reserved for default texture
 			if (textureNames[i].empty() && texId != NULL) {
 				matToTex[i] = texId;
@@ -1818,6 +1838,14 @@ namespace vulkan {
 
 		return meshModel;
 	}
+
+	void VulkanRenderer::createColourImage()
+	{
+		VkFormat colourFormat = swapChainImageFormat;
+
+		colourImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, colourFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &colourImageMemory, msaaSamples);
+		colourImageView = createImageView(colourImage, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+	}	
 
 	void VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
 	{
