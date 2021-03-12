@@ -8,8 +8,6 @@
 #include "MeshModel.h"
 #include "DirectionalLight.h"
 
-
-
 #ifndef STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 #endif
@@ -29,11 +27,6 @@
 #include <array>
 
 namespace vulkan {
-	struct VulkanDevice {
-		VkPhysicalDevice physicalDevice;
-		VkDevice logicalDevice;
-	};
-
 	class VulkanRenderer
 	{
 	public:
@@ -117,7 +110,7 @@ namespace vulkan {
 		// Create Functions
 		VkImageView createImageView(VkImage image, VkFormat format, VkImageAspectFlags aspectFlags);
 		VkShaderModule createShaderModule(const std::vector<char>& code);
-		VkImage createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory);
+		VkImage createImage(uint32_t width, uint32_t height, uint32_t mipLevels, VkFormat format, VkImageTiling tiling, VkImageUsageFlags useFlags, VkMemoryPropertyFlags propFlags, VkDeviceMemory* imageMemory, VkSampleCountFlagBits numSamples);
 
 		int createTextureImage(std::string fileName);
 		int createTexture(std::string fileName);

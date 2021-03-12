@@ -28,6 +28,11 @@ namespace vulkan {
 		}
 	};
 
+	struct VulkanDevice {
+		VkPhysicalDevice physicalDevice;
+		VkDevice logicalDevice;
+	};
+
 	struct SwapChainDetails {
 		VkSurfaceCapabilitiesKHR surfaceCapabilities; // Surface properties (e.g. image size/extent)
 		std::vector<VkSurfaceFormatKHR> formats;	  // Surface Image formats (e.g. RGBA and size of each colour)
@@ -44,9 +49,9 @@ namespace vulkan {
 		"VK_LAYER_KHRONOS_validation"
 	};
 #ifdef NDEBUG
-	const bool enableValidationLayers = false;
+	const bool enableValidationLayers = true;
 #else
-	const bool enableValidationLayers = false;
+	const bool enableValidationLayers = true;
 #endif
 
 	// Callback function for validation debugging (will be called when validation information record)
@@ -306,7 +311,8 @@ namespace vulkan {
 		endAndSubmitCommandBuffer(device.logicalDevice, commandPool, queue, commandBuffer);
 	}
 
-	static void transitionImageLayout(VkDevice device, VkQueue queue, VkCommandPool commandPool, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
+
+	static void transitionImageLayout(VkDevice device, VkQueue queue, VkCommandPool commandPool, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t mipLevels) {
 
 		// Create Buffer
 		VkCommandBuffer commandBuffer = beginCommandBuffer(device, commandPool);
@@ -321,7 +327,7 @@ namespace vulkan {
 		imageMemoryBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // Aspect of image being altered
 		imageMemoryBarrier.subresourceRange.baseMipLevel = 0; // First mip level to start alteration on
 		imageMemoryBarrier.subresourceRange.layerCount = 1; // Number of layers ot alter starting from baseArrayLayer
-		imageMemoryBarrier.subresourceRange.levelCount = 1; // Number of muip levels to alter starting from mipBaseLevel
+		imageMemoryBarrier.subresourceRange.levelCount = mipLevels; // Number of muip levels to alter starting from mipBaseLevel
 		imageMemoryBarrier.subresourceRange.baseArrayLayer = 0; // First layer to start alterations on
 
 		VkPipelineStageFlags srcStage;

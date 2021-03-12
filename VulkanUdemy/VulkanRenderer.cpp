@@ -1,6 +1,5 @@
 #include "VulkanRenderer.h"
 
-
 namespace vulkan {
 	VulkanRenderer::VulkanRenderer()
 	{
@@ -22,6 +21,7 @@ namespace vulkan {
 			createLogicalDevice();
 			createSwapChain();
 			createDepthBufferImage();
+			createColourImage();
 			createRenderPass();
 			createDescriptorSetLayout();
 			createPushConstantRange();
@@ -36,7 +36,7 @@ namespace vulkan {
 			createDescriptorSets();
 			createSynchronisation();
 
-			uboViewProjection.projection = glm::perspective(glm::radians(45.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
+			uboViewProjection.projection = glm::perspective(glm::radians(70.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
 			uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
 
 		}
@@ -78,26 +78,9 @@ namespace vulkan {
 			vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
 		}
 
-	cleanupSwapChain();
-	createSwapChain();
-	createDepthBufferImage();
-	createColourImage();
-	createRenderPass();
-	createGraphicsPipeline();
-	createFrameBuffers();
-	createCommandBuffers();
-}
-
-void VulkanRenderer::cleanup()
-{
-	// Clean up all components of the swapchain, render pass, graphics pipeline, command buffers, image views
-	cleanupSwapChain();
-
-	for (size_t i = 0; i < textureImages.size(); i++) {
-		vkDestroyImage(mainDevice.logicalDevice, textureImages[i], nullptr);
-		vkFreeMemory(mainDevice.logicalDevice, textureImageMemory[i], nullptr);
-		vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
-	}
+		vkDestroyDescriptorPool(mainDevice.logicalDevice, samplerDescriptorPool, nullptr);
+		vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, samplerSetLayout, nullptr);
+		vkDestroySampler(mainDevice.logicalDevice, textureSampler, nullptr);
 
 		for (size_t i = 0; i < modelList.size(); i++) {
 			modelList[i].destroyMeshModel();
@@ -358,16 +341,6 @@ void VulkanRenderer::cleanup()
 
 	void VulkanRenderer::createSurface()
 	{
-		if (glfwVulkanSupported() == GLFW_TRUE) {
-			std::cout << "SUPPORTED\n";
-		}
-		else {
-			std::cout << "FALSE\n";
-		}
-		uint32_t count;
-		const char** extensions = glfwGetRequiredInstanceExtensions(&count);
-		//std::cout << extensions << "\n";
-
 		// Create the surface (Creating a surface create info struct, specific to GLFW window type) - returns result
 		VkResult result = glfwCreateWindowSurface(instance, window->getWindow(), nullptr, &surface);
 		if (result != VK_SUCCESS) throw std::runtime_error("Failed to create surface");
@@ -512,7 +485,7 @@ void VulkanRenderer::cleanup()
 		}
 
 
-		return indicies.isValid() && extensionsSupported && swapChainValid &deviceFeatures.samplerAnisotropy;
+		return indicies.isValid() && extensionsSupported && swapChainValid & deviceFeatures.samplerAnisotropy;
 	}
 
 	bool VulkanRenderer::checkValidiationLayerSupport()
@@ -645,6 +618,22 @@ void VulkanRenderer::cleanup()
 		return swapChainDetails;
 	}
 
+	VkSampleCountFlagBits VulkanRenderer::getMaxUseableSampleCount()
+	{
+		VkPhysicalDeviceProperties physicalDeviceProperties;
+		vkGetPhysicalDeviceProperties(mainDevice.physicalDevice, &physicalDeviceProperties);
+
+		VkSampleCountFlags counts = physicalDeviceProperties.limits.framebufferColorSampleCounts & physicalDeviceProperties.limits.framebufferDepthSampleCounts;
+		if (counts & VK_SAMPLE_COUNT_64_BIT) { return VK_SAMPLE_COUNT_64_BIT; }
+		if (counts & VK_SAMPLE_COUNT_32_BIT) { return VK_SAMPLE_COUNT_32_BIT; }
+		if (counts & VK_SAMPLE_COUNT_16_BIT) { return VK_SAMPLE_COUNT_16_BIT; }
+		if (counts & VK_SAMPLE_COUNT_8_BIT) { return VK_SAMPLE_COUNT_8_BIT; }
+		if (counts & VK_SAMPLE_COUNT_4_BIT) { return VK_SAMPLE_COUNT_4_BIT; }
+		if (counts & VK_SAMPLE_COUNT_2_BIT) { return VK_SAMPLE_COUNT_2_BIT; }
+
+		return VK_SAMPLE_COUNT_1_BIT;
+	}
+
 	// Best format various based on application specification, will use VK_FORMAT_R8G8B8A8_UNIFORM || VK_FORMAT_B8G8R8A8_UNORM (Backup)
 	// Color space, SRGB, AdobeRGB etc. Will use VK_COLOR_SPACE_SRGB_NONLINEAR_KHR (SRGB)
 	VkSurfaceFormatKHR VulkanRenderer::chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats)
@@ -686,7 +675,8 @@ void VulkanRenderer::cleanup()
 		if (surfaceCapabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) // If current extend is at numeric limits, the extend van vary. Otherwise it is the size of the window.
 		{
 			return surfaceCapabilities.currentExtent;
-		} else {
+		}
+		else {
 			// If value can vary, need to set manually
 			int width, height;
 			glfwGetFramebufferSize(window->getWindow(), &width, &height); // Get width and height from window (glfw)
@@ -797,6 +787,7 @@ void VulkanRenderer::cleanup()
 		vkGetSwapchainImagesKHR(mainDevice.logicalDevice, swapchain, &swapChainImageCount, images.data());
 
 		for (VkImage image : images) {
+
 			// Store the image handle
 			SwapChainImage swapChainImage = {};
 			swapChainImage.image = image;
@@ -1004,34 +995,26 @@ void VulkanRenderer::cleanup()
 		rasterizerStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // Winding to determine which side is front
 		rasterizerStateCreateInfo.depthBiasEnable = VK_FALSE; // Whether to add depth bias to fragments (good for stopping "shadow achne" in shadow mapping)
 
-		// Multisampling (Disabled for now)
+		// Multisampling
 		VkPipelineMultisampleStateCreateInfo multisampleCreateInfo = {};
 		multisampleCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 		multisampleCreateInfo.sampleShadingEnable = VK_FALSE; // Enable multisample shading or not
-		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT; // Number of samples to use per fragment
+		multisampleCreateInfo.rasterizationSamples = msaaSamples; // Number of samples to use per fragment
 
-		// Blending
-		VkPipelineColorBlendAttachmentState colorState = {};
-		colorState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT; // Mask for what colors to be blended
-		colorState.blendEnable = VK_TRUE; // Enable blending
+		VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+		colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+		colorBlendAttachment.blendEnable = VK_FALSE;
 
-		// Blending uses equation: (srcColorBlendFactor * new color) colorBlendOp (dstColorBlendFactor * old color)
-		colorState.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-		colorState.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
-		colorState.colorBlendOp = VK_BLEND_OP_ADD;
-		// (new color alpha * new color) + ((1 - new color alpha) * old color)
-
-		// How to blend alpha values ( Replace old value with new alpha)
-		colorState.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-		colorState.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-		colorState.alphaBlendOp = VK_BLEND_OP_ADD;
-		// (1 * new alpha) + (0 * old alpha) = new alpha
-
-		VkPipelineColorBlendStateCreateInfo colorBlendingCreateInfo = {};
-		colorBlendingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-		colorBlendingCreateInfo.logicOpEnable = VK_FALSE;
-		colorBlendingCreateInfo.attachmentCount = 1;
-		colorBlendingCreateInfo.pAttachments = &colorState;
+		VkPipelineColorBlendStateCreateInfo colorBlending{};
+		colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+		colorBlending.logicOpEnable = VK_FALSE;
+		colorBlending.logicOp = VK_LOGIC_OP_COPY;
+		colorBlending.attachmentCount = 1;
+		colorBlending.pAttachments = &colorBlendAttachment;
+		colorBlending.blendConstants[0] = 0.0f;
+		colorBlending.blendConstants[1] = 0.0f;
+		colorBlending.blendConstants[2] = 0.0f;
+		colorBlending.blendConstants[3] = 0.0f;
 
 		// Pipeline layout (descriptor sets and push constants)
 		std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts = { descriptorSetLayout, samplerSetLayout };
@@ -1070,7 +1053,7 @@ void VulkanRenderer::cleanup()
 		pipelineCreateInfo.pDynamicState = nullptr;
 		pipelineCreateInfo.pRasterizationState = &rasterizerStateCreateInfo;
 		pipelineCreateInfo.pMultisampleState = &multisampleCreateInfo;
-		pipelineCreateInfo.pColorBlendState = &colorBlendingCreateInfo;
+		pipelineCreateInfo.pColorBlendState = &colorBlending;
 		pipelineCreateInfo.pDepthStencilState = &depthStencilCreateInfo;
 		pipelineCreateInfo.layout = pipelineLayout; // Pipeline layout pipeline should use
 		pipelineCreateInfo.renderPass = renderPass; // Render pass description the pipeline is compatible with
@@ -1099,7 +1082,7 @@ void VulkanRenderer::cleanup()
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 		// Create the depth buffer image
-		depthBufferImage = createImage(swapChainExtent.width, swapChainExtent.height, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthBufferImageMemory);
+		depthBufferImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthBufferImageMemory, msaaSamples);
 
 		// Create depth buffer image view
 		depthBufferImageView = createImageView(depthBufferImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -1111,9 +1094,10 @@ void VulkanRenderer::cleanup()
 		swapChainFramebuffers.resize(swapChainImages.size());
 		for (size_t i = 0; i < swapChainFramebuffers.size(); i++) {
 
-			std::array<VkImageView, 2> attachments = {
-				swapChainImages[i].imageView,
-				depthBufferImageView
+			std::array<VkImageView, 3> attachments = {
+				colourImageView,
+				depthBufferImageView,
+				swapChainImages[i].imageView
 			};
 
 			VkFramebufferCreateInfo frameBufferCreateInfo = {};
@@ -1461,7 +1445,7 @@ void VulkanRenderer::cleanup()
 		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		samplerCreateInfo.mipLodBias = 0.0f; // Level of detail bias for mip level
 		samplerCreateInfo.minLod = 0.0f;
-		samplerCreateInfo.maxLod = static_cast<float>(mipLevels /2);
+		samplerCreateInfo.maxLod = static_cast<float>(mipLevels / 2);
 		samplerCreateInfo.anisotropyEnable = VK_TRUE;
 		samplerCreateInfo.maxAnisotropy = 16; // Sample level of anisotropy
 
@@ -1469,6 +1453,7 @@ void VulkanRenderer::cleanup()
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create sampler");
 		}
+
 	}
 
 	void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
@@ -1703,7 +1688,7 @@ void VulkanRenderer::cleanup()
 		// Create staging buffer to hold loaded data, ready to copy to device
 		VkBuffer imageStagingBuffer;
 		VkDeviceMemory imageStagingBufferMemory;
-		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, 
+		createBuffer(mainDevice.physicalDevice, mainDevice.logicalDevice, imageSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
 			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			&imageStagingBuffer, &imageStagingBufferMemory);
 
@@ -1739,7 +1724,7 @@ void VulkanRenderer::cleanup()
 		vkFreeMemory(mainDevice.logicalDevice, imageStagingBufferMemory, nullptr);
 
 		// Return index of new texture image
-		return textureImages.size()-1;
+		return textureImages.size() - 1;
 	}
 
 	int VulkanRenderer::createTexture(std::string fileName)
@@ -1801,9 +1786,9 @@ void VulkanRenderer::cleanup()
 	{
 		// Import model "scene"
 		Assimp::Importer importer;
-		const aiScene *scene = importer.ReadFile(modelFile, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices);
+		const aiScene* scene = importer.ReadFile(modelFile, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices);
 		if (!scene) {
-			throw std::runtime_error("Failed to load model ("+modelFile+")");
+			throw std::runtime_error("Failed to load model (" + modelFile + ")");
 		}
 
 		// Get vector of all materials with 1:1 ID placment
@@ -1815,8 +1800,8 @@ void VulkanRenderer::cleanup()
 		std::cout << textureNames.size();
 
 		for (size_t i = 0; i < textureNames.size(); i++) {
-			
-			std::cout << textureNames[i] << " " << i <<"\n";
+
+			std::cout << textureNames[i] << " " << i << "\n";
 			// If material has no texture, set 0 to indicate no texture. texture 0 will be reserved for default texture
 			if (textureNames[i].empty() && texId != NULL) {
 				matToTex[i] = texId;
@@ -1839,18 +1824,18 @@ void VulkanRenderer::cleanup()
 		return meshModel;
 	}
 
+	void VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
+	{
+		Mesh mesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &indices, &vertices, createTexture(fileName));
+		meshList.push_back(mesh);
+	}
+
 	void VulkanRenderer::createColourImage()
 	{
 		VkFormat colourFormat = swapChainImageFormat;
 
 		colourImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, colourFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &colourImageMemory, msaaSamples);
 		colourImageView = createImageView(colourImage, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
-	}	
-
-	void VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
-	{
-		Mesh mesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &indices, &vertices, createTexture(fileName));
-		meshList.push_back(mesh);
 	}
 
 	stbi_uc* VulkanRenderer::loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize)
@@ -1863,7 +1848,7 @@ void VulkanRenderer::cleanup()
 		stbi_uc* image = stbi_load(fileLoc.c_str(), width, height, &channels, STBI_rgb_alpha);
 
 		if (!image) {
-			throw std::runtime_error("Failed to load a texture file! ("+fileName+")");
+			throw std::runtime_error("Failed to load a texture file! (" + fileName + ")");
 		}
 
 		// Calculate image size using given data
