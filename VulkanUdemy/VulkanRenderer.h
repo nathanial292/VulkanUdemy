@@ -118,6 +118,7 @@ namespace vulkan {
 
 		// Model creation
 		MeshModel createMeshModel(std::string modelFile, int texId);
+		void createModel(const char* modelName, const char* textureName);
 		void createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName);
 
 		// Colour Resources

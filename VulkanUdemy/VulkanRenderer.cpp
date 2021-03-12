@@ -1797,11 +1797,11 @@ namespace vulkan {
 		// Conversion from materials list IDs to our descriptor array IDs
 		std::vector<int> matToTex(textureNames.size());
 
-		std::cout << textureNames.size();
+		//std::cout << textureNames.size();
 
 		for (size_t i = 0; i < textureNames.size(); i++) {
 
-			std::cout << textureNames[i] << " " << i << "\n";
+			//std::cout << textureNames[i] << " " << i << "\n";
 			// If material has no texture, set 0 to indicate no texture. texture 0 will be reserved for default texture
 			if (textureNames[i].empty() && texId != NULL) {
 				matToTex[i] = texId;
@@ -1822,6 +1822,12 @@ namespace vulkan {
 		MeshModel meshModel = MeshModel(modelMeshes);
 
 		return meshModel;
+	}
+
+	void VulkanRenderer::createModel(const char* modelName, const char* textureName)
+	{
+		MeshModel model = createMeshModel(modelName, createTexture(textureName));
+		modelList.push_back(model);
 	}
 
 	void VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
