@@ -335,6 +335,16 @@ namespace vulkan {
 
 	void VulkanRenderer::createSurface()
 	{
+		if (glfwVulkanSupported() == GLFW_TRUE) {
+			std::cout << "SUPPORTED\n";
+		}
+		else {
+			std::cout << "FALSE\n";
+		}
+		uint32_t count;
+		const char** extensions = glfwGetRequiredInstanceExtensions(&count);
+		//std::cout << extensions << "\n";
+
 		// Create the surface (Creating a surface create info struct, specific to GLFW window type) - returns result
 		VkResult result = glfwCreateWindowSurface(instance, window->getWindow(), nullptr, &surface);
 		if (result != VK_SUCCESS) throw std::runtime_error("Failed to create surface");
@@ -863,8 +873,8 @@ namespace vulkan {
 	void VulkanRenderer::createGraphicsPipeline()
 	{
 		// Read in SPIR-V code of shaders
-		auto vertexShaderCode = readFile("shaders/vert.spv");
-		auto fragShaderCode = readFile("shaders/frag.spv");
+		auto vertexShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/vert.spv");
+		auto fragShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/frag.spv");
 
 		// Build shader Modules to link to graphics pipeline
 		VkShaderModule vertShaderModule = createShaderModule(vertexShaderCode);
@@ -1479,8 +1489,8 @@ namespace vulkan {
 		vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
 
 		glm::vec3 cameraPosition = camera->getCameraPosition();
-		std::cout << "CAMERA POSITION" << "\n";
-		std::cout << cameraPosition.x << " " << cameraPosition.y << " " << cameraPosition.z << "\n";
+		//std::cout << "CAMERA POSITION" << "\n";
+		//std::cout << cameraPosition.x << " " << cameraPosition.y << " " << cameraPosition.z << "\n";
 
 		vkMapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex], 0, sizeof(glm::vec3), 0, &data);
 		memcpy(data, &cameraPosition, sizeof(glm::vec3));
@@ -1542,30 +1552,29 @@ namespace vulkan {
 				// Execute our pipeline
 				vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
 			}
+		}
+		for (size_t j = 0; j < meshList.size(); j++) {
+			Mesh thisMesh = meshList[j];
+			Model thisModel = thisMesh.getModel();
+			// Bind our vertex buffer
+			VkBuffer vertexBuffers[] = { meshList[j].getVertexBuffer() }; // Buffers to bind
+			VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+			vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
+			vkCmdBindIndexBuffer(commandBuffers[currentImage], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
 
-			for (size_t j = 0; j < meshList.size(); j++) {
-				Mesh thisMesh = meshList[j];
-				Model thisModel = thisMesh.getModel();
-				// Bind our vertex buffer
-				VkBuffer vertexBuffers[] = { meshList[j].getVertexBuffer() }; // Buffers to bind
-				VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
-				vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
-				vkCmdBindIndexBuffer(commandBuffers[currentImage], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
+			// Dynamic offset amount
+			uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
 
-				// Dynamic offset amount
-				uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+			std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
 
-				std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
+			// Bind descriptor sets
+			vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+				0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
 
-				// Bind descriptor sets
-				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &thisModel.model);
 
-				vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &thisModel.model);
-
-				// Execute our pipeline
-				vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
-			}
+			// Execute our pipeline
+			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
 		}
 
 		vkCmdEndRenderPass(commandBuffers[currentImage]);
@@ -1808,6 +1817,12 @@ namespace vulkan {
 		MeshModel meshModel = MeshModel(modelMeshes);
 
 		return meshModel;
+	}
+
+	void VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
+	{
+		Mesh mesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &indices, &vertices, createTexture(fileName));
+		meshList.push_back(mesh);
 	}
 
 	stbi_uc* VulkanRenderer::loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize)

@@ -8,6 +8,8 @@
 #include <glm/glm.hpp>
 #include <GLFW/glfw3.h>
 
+#include "../../API Wrapper/Utilities.h"
+
 namespace vulkan {
 	const int MAX_FRAME_DRAWS = 2;
 	const int MAX_OBJECTS = 20;
@@ -35,13 +37,6 @@ namespace vulkan {
 	struct SwapChainImage {
 		VkImage image;
 		VkImageView imageView;
-	};
-
-	struct Vertex {
-		glm::vec3 pos; // vertex position (x,y,z)
-		glm::vec3 col; // vertex color (r,g,b)
-		glm::vec2 tex; // Texture coords (u, v)
-		glm::vec3 normal; // Normals
 	};
 
 	// Validation layers for Vulkan

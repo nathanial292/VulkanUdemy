@@ -1,18 +1,22 @@
 #define GLFW_INCLUDE_VULKAN
 
-#include <GLFW/glfw3.h>
+#include "../../API Wrapper/Window.h"
+#include "../../API Wrapper/Camera.h"
+
 #include "Utilities.h"
 #include "Mesh.h"
 #include "MeshModel.h"
-#include "Window.h"
-#include "Camera.h"
 #include "DirectionalLight.h"
+
+
+
+#ifndef STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#endif
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
-
-#include "stb_image.h"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -120,6 +124,7 @@ namespace vulkan {
 
 		// Model creation
 		MeshModel createMeshModel(std::string modelFile, int texId);
+		void createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName);
 
 		// Loader Functions
 		stbi_uc* loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize); // Return a unsigned char byte array
