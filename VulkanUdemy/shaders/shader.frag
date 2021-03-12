@@ -29,7 +29,7 @@ layout(set = 0, binding = 3) uniform CameraPosition {
 
 vec4 CalcDirectionalLight()
 {
-	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.1;
+	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.4;
 	
 	vec3 normal = normalize(Normal);
 	vec3 lightDir = -normalize(directionalLight.direction - FragPos);

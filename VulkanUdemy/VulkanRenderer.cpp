@@ -36,9 +36,6 @@ namespace vulkan {
 			createDescriptorSets();
 			createSynchronisation();
 
-			uboViewProjection.projection = glm::perspective(glm::radians(70.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
-			uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
-
 		}
 		catch (const std::runtime_error& e) {
 			printf("ERROR: %s\n", e.what());
@@ -77,6 +74,9 @@ namespace vulkan {
 			vkFreeMemory(mainDevice.logicalDevice, textureImageMemory[i], nullptr);
 			vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
 		}
+		textureImages.clear();
+		textureImageViews.clear();
+		textureImageMemory.clear();
 
 		vkDestroyDescriptorPool(mainDevice.logicalDevice, samplerDescriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, samplerSetLayout, nullptr);
@@ -85,6 +85,11 @@ namespace vulkan {
 		for (size_t i = 0; i < modelList.size(); i++) {
 			modelList[i].destroyMeshModel();
 		}
+		modelList.clear();
+		for (size_t i = 0; i < meshList.size(); i++) {
+			meshList[i].destroyBuffers();
+		}
+		meshList.clear();
 
 		// C style memory free for dynamic descriptor sets
 		_aligned_free(modelTransferSpace);
@@ -102,9 +107,6 @@ namespace vulkan {
 			vkFreeMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[i], nullptr);
 			vkDestroyBuffer(mainDevice.logicalDevice, cameraPositionUniformBuffer[i], nullptr);
 			vkFreeMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[i], nullptr);
-		}
-		for (size_t i = 0; i < meshList.size(); i++) {
-			meshList[i].destroyBuffers();
 		}
 		for (size_t i = 0; i < MAX_FRAME_DRAWS; i++) {
 			vkDestroySemaphore(mainDevice.logicalDevice, renderFinished[i], nullptr);
@@ -163,7 +165,7 @@ namespace vulkan {
 		meshList[modelId].setModel(newModel);
 	}
 
-	void VulkanRenderer::draw()
+	void VulkanRenderer::draw(glm::mat4 projection, glm::mat4 viewMatrix)
 	{
 		// Stop running code until the fence is opened, only opened when the frame is finished drawing
 		vkWaitForFences(mainDevice.logicalDevice, 1, &drawFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
@@ -182,7 +184,11 @@ namespace vulkan {
 			throw std::runtime_error("Failed to acquire swap chain image");
 		}
 
-		uboViewProjection.view = camera->calculateViewMatrix();
+
+		//uboViewProjection.projection = glm::perspective(glm::radians(70.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
+		uboViewProjection.projection = projection;
+		uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
+		uboViewProjection.view = viewMatrix;
 		recordCommands(imageIndex); // Rerecord commands every draw
 		updateUniformBuffers(imageIndex);
 
@@ -1465,13 +1471,29 @@ namespace vulkan {
 		vkUnmapMemory(mainDevice.logicalDevice, vpUniformBufferMemory[imageIndex]);
 
 		// Copy Model data
-		for (size_t i = 0; i < meshList.size(); i++) {
-			Model* thisModel = (Model*)((uint64_t)modelTransferSpace + (i * modelUniformAlignment));
-			*thisModel = meshList[i].getModel();
+		// Calculate size of meshes for all models
+		int meshCount = 0;
+		for (size_t i = 0; i < modelList.size(); i++) {
+			for (size_t j = 0; j < modelList[i].getMeshCount(); j++)
+			{
+				meshCount += 1;
+				Model* thisModel = (Model*)((uint64_t)modelTransferSpace + (j * modelUniformAlignment));
+				*thisModel = modelList[i].getMesh(j)->getModel();
+			}
 		}
+		int modelMeshCount = meshCount;
+		for (size_t i = 0; i < meshList.size(); i++) {
+			Model* thisModel = (Model*)((uint64_t)modelTransferSpace + ((i+ modelMeshCount) * modelUniformAlignment));
+			*thisModel = meshList[i].getModel();
+
+			meshCount += 1;
+		}
+
+		std::cout << meshCount<<"\n";
+
 		// Map the list of model data
 		vkMapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex], 0, modelUniformAlignment * meshList.size(), 0, &data);
-		memcpy(data, modelTransferSpace, modelUniformAlignment * meshList.size());
+		memcpy(data, modelTransferSpace, modelUniformAlignment * meshCount);
 		vkUnmapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex]);
 
 		UniformLight light = directionalLight.getLight();
@@ -1824,16 +1846,20 @@ namespace vulkan {
 		return meshModel;
 	}
 
-	void VulkanRenderer::createModel(const char* modelName, const char* textureName)
+	int VulkanRenderer::createModel(const char* modelName, const char* textureName)
 	{
 		MeshModel model = createMeshModel(modelName, createTexture(textureName));
 		modelList.push_back(model);
+
+		return modelList.size() - 1;
 	}
 
-	void VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
+	int VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
 	{
 		Mesh mesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &indices, &vertices, createTexture(fileName));
 		meshList.push_back(mesh);
+
+		return meshList.size() - 1;
 	}
 
 	void VulkanRenderer::createColourImage()
@@ -1850,7 +1876,7 @@ namespace vulkan {
 		int channels;
 
 		// Load pixel data for image
-		std::string fileLoc = "textures/" + fileName;
+		std::string fileLoc = "" + fileName;
 		stbi_uc* image = stbi_load(fileLoc.c_str(), width, height, &channels, STBI_rgb_alpha);
 
 		if (!image) {

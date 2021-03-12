@@ -37,7 +37,7 @@ namespace vulkan {
 		void updateModel(int modelId, glm::mat4 newModel);
 		void updateModelMesh(int modelId, glm::mat4 newModel);
 
-		void draw();
+		void draw(glm::mat4 projection, glm::mat4 viewMatrix);
 		void cleanup();
 		void cleanupSwapChain();
 
@@ -101,6 +101,8 @@ namespace vulkan {
 		SwapChainDetails getSwapChainDetails(VkPhysicalDevice device);
 		VkSampleCountFlagBits getMaxUseableSampleCount();
 
+		VkExtent2D getSwapChainExtent() { return swapChainExtent; }
+
 		// Choose Functions
 		VkSurfaceFormatKHR chooseBestSurfaceFormat(const std::vector<VkSurfaceFormatKHR>& formats);
 		VkPresentModeKHR chooseBestPresentationMode(const std::vector<VkPresentModeKHR>& presentationModes);
@@ -118,8 +120,8 @@ namespace vulkan {
 
 		// Model creation
 		MeshModel createMeshModel(std::string modelFile, int texId);
-		void createModel(const char* modelName, const char* textureName);
-		void createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName);
+		int createModel(const char* modelName, const char* textureName);
+		int createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName);
 
 		// Colour Resources
 		void createColourImage();
