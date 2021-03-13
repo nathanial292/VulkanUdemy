@@ -169,7 +169,9 @@ namespace vulkan {
 		VkSwapchainKHR swapchain;
 		std::vector<SwapChainImage> swapChainImages;
 		std::vector<VkFramebuffer> swapChainFramebuffers;
+		std::vector<VkFramebuffer> imguiFrameBuffers;
 		std::vector<VkCommandBuffer> commandBuffers;
+		std::vector<VkCommandBuffer> imguiCommandBuffers;
 
 		// Depth buffer class members
 		VkImage depthBufferImage;
@@ -205,6 +207,7 @@ namespace vulkan {
 
 		// Pools
 		VkCommandPool graphicsCommandPool;
+		VkCommandPool imguiCommandPool;
 
 		// Utility
 		VkFormat swapChainImageFormat;

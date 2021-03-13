@@ -23,6 +23,7 @@ namespace vulkan {
 			createDepthBufferImage();
 			createColourImage();
 			createRenderPass();
+			createImguiRenderPass();
 			createDescriptorSetLayout();
 			createPushConstantRange();
 			createGraphicsPipeline();
@@ -52,12 +53,10 @@ namespace vulkan {
 		int width = 0, height = 0;
 		glfwGetFramebufferSize(window->getWindow(), &width, &height);
 		while (width == 0 || height == 0) {
-
-			ImGui_ImplVulkan_SetMinImageCount(2);
-
 			glfwGetFramebufferSize(window->getWindow(), &width, &height);
 			glfwWaitEvents();
 		}
+		ImGui_ImplVulkan_SetMinImageCount(2);
 
 		cleanupSwapChain();
 		createSwapChain();
@@ -123,6 +122,8 @@ namespace vulkan {
 			vkDestroyFence(mainDevice.logicalDevice, drawFences[i], nullptr);
 		}
 		vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool, nullptr);
+		vkDestroyCommandPool(mainDevice.logicalDevice, imguiCommandPool, nullptr);
+
 
 		vkDestroySurfaceKHR(instance, surface, nullptr);
 		if (enableValidationLayers) {
@@ -137,14 +138,17 @@ namespace vulkan {
 		vkDeviceWaitIdle(mainDevice.logicalDevice);
 
 		vkFreeCommandBuffers(mainDevice.logicalDevice, graphicsCommandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+		vkFreeCommandBuffers(mainDevice.logicalDevice, imguiCommandPool, static_cast<uint32_t>(imguiCommandBuffers.size()), imguiCommandBuffers.data());
 
 		for (auto framebuffer : swapChainFramebuffers) {
+			vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
+		}
+		for (auto framebuffer : imguiFrameBuffers) {
 			vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
 		}
 		vkDestroyPipeline(mainDevice.logicalDevice, graphicsPipeline, nullptr);
 		vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout, nullptr);
 		vkDestroyRenderPass(mainDevice.logicalDevice, renderPass, nullptr);
-
 		vkDestroyRenderPass(mainDevice.logicalDevice, imguiRenderPass, nullptr);
 
 		// Cleanup for depth buffer
@@ -216,9 +220,13 @@ namespace vulkan {
 		VkPipelineStageFlags waitStages[] = {
 			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
 		};
+
+		std::array<VkCommandBuffer, 2> submitCommandBuffers =
+		{ commandBuffers[imageIndex], imguiCommandBuffers[imageIndex] };
+
 		submitInfo.pWaitDstStageMask = waitStages; // stages to check semaphores at
-		submitInfo.commandBufferCount = 1; // Number of command buffers to submit
-		submitInfo.pCommandBuffers = &commandBuffers[imageIndex]; // Command buffer to submit
+		submitInfo.commandBufferCount = static_cast<uint32_t>(submitCommandBuffers.size()); // Number of command buffers to submit
+		submitInfo.pCommandBuffers = submitCommandBuffers.data(); // Command buffer to submit
 		submitInfo.signalSemaphoreCount = 1; // Number of semaphore to signal
 		submitInfo.pSignalSemaphores = &renderFinished[currentFrame]; // Semaphores to signal when command buffer finishes
 
@@ -894,6 +902,7 @@ namespace vulkan {
 		colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 		colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		//colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
 		VkAttachmentReference colorAttachmentRef{};
 		colorAttachmentRef.attachment = 0;
@@ -1179,6 +1188,26 @@ namespace vulkan {
 				throw std::runtime_error("Failed to create a framebuffer");
 			}
 		}
+
+		imguiFrameBuffers.resize(swapChainImages.size());
+		for (size_t i = 0; i < imguiFrameBuffers.size(); i++) {
+			std::array<VkImageView, 1> attachments = {
+				swapChainImages[i].imageView
+			};
+			VkFramebufferCreateInfo frameBufferCreateInfo = {};
+			frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+			frameBufferCreateInfo.renderPass = imguiRenderPass; // Renderpass layout the framebuffer will be used with
+			frameBufferCreateInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+			frameBufferCreateInfo.pAttachments = attachments.data(); // List of attachments 1-to-1 with renderpass
+			frameBufferCreateInfo.width = swapChainExtent.width; // Framebuffer width
+			frameBufferCreateInfo.height = swapChainExtent.height; // Framebuffer height
+			frameBufferCreateInfo.layers = 1; // Framebuffer layers
+
+			VkResult result = vkCreateFramebuffer(mainDevice.logicalDevice, &frameBufferCreateInfo, nullptr, &imguiFrameBuffers[i]);
+			if (result != VK_SUCCESS) {
+				throw std::runtime_error("Failed to create a framebuffer");
+			}
+		}
 	}
 
 	void VulkanRenderer::createCommandPool()
@@ -1193,6 +1222,12 @@ namespace vulkan {
 
 		// Create a graphics queue family command pool
 		VkResult result = vkCreateCommandPool(mainDevice.logicalDevice, &poolInfo, nullptr, &graphicsCommandPool);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create graphics pool (Command Pool)");
+		}
+
+		// Create a graphics queue family imgui command pool
+		result = vkCreateCommandPool(mainDevice.logicalDevice, &poolInfo, nullptr, &imguiCommandPool);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create graphics pool (Command Pool)");
 		}
@@ -1211,6 +1246,14 @@ namespace vulkan {
 		VkResult result = vkAllocateCommandBuffers(mainDevice.logicalDevice, &cbAllocInfo, commandBuffers.data());
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to allocate Command Buffers!");
+		}
+
+		imguiCommandBuffers.resize(swapChainImages.size());
+		cbAllocInfo.commandPool = imguiCommandPool;
+		cbAllocInfo.commandBufferCount = static_cast<uint32_t>(imguiCommandBuffers.size());
+		result = vkAllocateCommandBuffers(mainDevice.logicalDevice, &cbAllocInfo, imguiCommandBuffers.data());
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to allocate imgui buffer!");
 		}
 	}
 
@@ -1557,6 +1600,7 @@ namespace vulkan {
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
+		ImGui::StyleColorsDark();
 
 		// Setup Platform/Renderer backends
 		ImGui_ImplGlfw_InitForVulkan(window->getWindow(), true);
@@ -1572,7 +1616,7 @@ namespace vulkan {
 		init_info.MinImageCount = 2;
 		init_info.ImageCount = swapChainImages.size();
 		init_info.CheckVkResultFn = check_vk_result;
-		ImGui_ImplVulkan_Init(&init_info, renderPass);
+		ImGui_ImplVulkan_Init(&init_info, imguiRenderPass);
 
 		VkCommandBuffer commandBuffer = beginCommandBuffer(mainDevice.logicalDevice, graphicsCommandPool);
 		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
@@ -1713,8 +1757,23 @@ namespace vulkan {
 			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
 		}
 
-		ImDrawData* draw_data = ImGui::GetDrawData();
-		ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffers[currentImage]);
+		vkCmdEndRenderPass(commandBuffers[currentImage]);
+
+		VkRenderPassBeginInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		info.renderPass = imguiRenderPass;
+		info.framebuffer = imguiFrameBuffers[currentImage];
+		info.renderArea.extent.width = swapChainExtent.width;
+		info.renderArea.extent.height = swapChainExtent.height;
+		info.clearValueCount = 1;
+		std::array<VkClearValue, 1> clearValuesImgui = {};
+		clearValuesImgui[0].color = { 0.6f, 0.65f, 0.4f, 1.0f }; // Color attachment clear value
+		info.pClearValues = clearValuesImgui.data(); // List of clear values
+		info.clearValueCount = static_cast<uint32_t>(clearValuesImgui.size());
+
+		vkCmdBeginRenderPass(commandBuffers[currentImage], &info, VK_SUBPASS_CONTENTS_INLINE);
+
+			ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffers[currentImage]);
 
 		vkCmdEndRenderPass(commandBuffers[currentImage]);
 
