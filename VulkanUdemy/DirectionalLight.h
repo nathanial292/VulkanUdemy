@@ -3,11 +3,10 @@
 
 namespace vulkan {
     struct UniformLight {
+        glm::vec3 direction;
         glm::vec3 colour;
         float ambientIntensity;
         float diffuseIntensity;
-        glm::vec3 direction;
-
     };
 
     class DirectionalLight :

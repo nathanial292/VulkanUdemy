@@ -15,32 +15,34 @@ layout(set = 0, binding = 1) uniform UboModel {
 	bool hasTexture;
 } uboModel;
 
-
-struct Light
-{
-	vec3 colour;
-	float ambientIntensity;
-	float diffuseIntensity;
-};
 // Uniform buffer for light
 layout(set = 0, binding = 2) uniform DirectionalLight {
-	Light base;
-	vec3 direction;
+	float directionX;
+	float directionY;
+	float directionZ;
+	float colourR;
+	float colourG;
+	float colourB;
+	float ambientIntensity;
+	float diffuseIntensity;
 } directionalLight;
 
 layout(set = 0, binding = 3) uniform CameraPosition {
 	vec3 cameraPos;	
 } cameraPosition;
 
-vec4 CalcLightByDirection(Light light, vec3 direction)
+vec4 CalcLightByDirection()
 {
-	vec4 ambientColour = vec4(light.colour, 1.0f) * light.ambientIntensity;
+	vec3 colour = vec3(directionalLight.colourR, directionalLight.colourG, directionalLight.colourB);
+	vec3 direction = vec3(directionalLight.directionX, directionalLight.directionY, directionalLight.directionZ); 
+
+	vec4 ambientColour = vec4(colour, 1.0f) * directionalLight.ambientIntensity;
 	
 	vec3 normal = normalize(Normal);
 	vec3 lightDir = normalize(direction - FragPos);
 	
 	float diffuseFactor = max(dot(normal, lightDir), 0.0f);
-	vec4 diffuseColour = vec4(light.colour * light.diffuseIntensity * diffuseFactor, 1.0f);
+	vec4 diffuseColour = vec4(colour * directionalLight.diffuseIntensity * diffuseFactor, 1.0f);
 	
 	vec4 specularColour = vec4(0, 0, 0, 0);
 	if(diffuseFactor > 0.0f)
@@ -52,7 +54,7 @@ vec4 CalcLightByDirection(Light light, vec3 direction)
 		if(specularFactor > 0.0f)
 		{
 			specularFactor = pow(specularFactor, 128);
-			specularColour = vec4(light.colour * 0.5 * specularFactor, 1.0f);
+			specularColour = vec4(colour * 0.5 * specularFactor, 1.0f);
 		}
 	}
 	
@@ -62,7 +64,7 @@ vec4 CalcLightByDirection(Light light, vec3 direction)
 vec4 CalcDirectionalLight()
 {
 	//float shadowFactor = CalcDirectionalShadowFactor();
-	return CalcLightByDirection(directionalLight.base, directionalLight.direction);
+	return CalcLightByDirection();
 }
 
 void main() 

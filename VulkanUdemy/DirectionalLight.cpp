@@ -14,11 +14,10 @@ namespace vulkan {
 	UniformLight DirectionalLight::getLight()
 	{
 		UniformLight light = {};
-		light.colour = colour;
-		light.ambientIntensity = ambientIntensity;
-		light.diffuseIntensity = diffuseIntensity;
-		light.direction = direction;
-
+		light.direction = this->direction;
+		light.colour = this->colour;
+		light.ambientIntensity = this->ambientIntensity;
+		light.diffuseIntensity = this->diffuseIntensity;
 		return light;
 	}
 

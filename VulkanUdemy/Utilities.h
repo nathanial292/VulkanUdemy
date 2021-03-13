@@ -63,7 +63,7 @@ namespace vulkan {
 #ifdef NDEBUG
 	const bool enableValidationLayers = false;
 #else
-	const bool enableValidationLayers = true;
+	const bool enableValidationLayers = false;
 #endif
 
 	// Callback function for validation debugging (will be called when validation information record)

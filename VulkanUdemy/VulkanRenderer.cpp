@@ -1656,16 +1656,14 @@ namespace vulkan {
 		vkUnmapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex]);
 
 		UniformLight light = directionalLight->getLight();
-		//std::cout << light.direction.x << " " << light.direction.y << " " << light.direction.z << "\n";
-		//std::cout << light.diffuseIntensity << "\n";
-		//std::cout << light.ambientIntensity << "\n";
-
-
+		//std::cout << "direction:" << light.direction.x << " " << light.direction.y << " " << light.direction.z << "\n";
+		//std::cout << "colour :" << light.colour.x << " " << light.colour.y << " " << light.colour.z << "\n";
 		//std::cout << "ambient intensity: " << light.ambientIntensity << "\n";
 		//std::cout << "diffuse intensity: " << light.diffuseIntensity << "\n";
+		std::cout << "size of light :" << sizeof(light.ambientIntensity) << "\n";
 
-		vkMapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex], 0, sizeof(UniformLight), 0, &data);
-		memcpy(data, &light, sizeof(UniformLight));
+		vkMapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex], 0, 32, 0, &data);
+		memcpy(data, &light, 32);
 		vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
 
 		glm::vec3 cameraPosition = camera->getCameraPosition();
@@ -2058,7 +2056,6 @@ namespace vulkan {
 
 	void VulkanRenderer::updateDirectionalLight(glm::vec3 *position, glm::vec3 *colour, float *ambientIntensity, float *diffuseIntensity)
 	{
-		if (directionalLight == nullptr) return;
 		directionalLight->updateLight(position, colour, ambientIntensity, diffuseIntensity);
 	}
 
