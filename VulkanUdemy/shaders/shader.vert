@@ -23,7 +23,8 @@ layout(location = 3) out vec3 FragPos;
 void main() {
 	gl_Position = uboViewProjection.projection * uboViewProjection.view * pushModel.model * vec4(pos, 1.0);
 	
-	Normal = mat3(transpose(inverse(pushModel.model))) * normal;  
+	//Normal = mat3(transpose(inverse(pushModel.model))) * normal;  
+	Normal = normal;
 	
 	FragPos = vec3(pushModel.model * vec4(pos, 1.0)); 	
 	fragCol = col;

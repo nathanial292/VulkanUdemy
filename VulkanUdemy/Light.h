@@ -8,7 +8,7 @@ namespace vulkan {
 	{
 	public:
 		Light();
-		Light(float red, float green, float blue, float aIntensity, float dIntensity);
+		Light(glm::vec3 colour, float aIntensity, float dIntensity);
 
 		~Light();
 	protected:

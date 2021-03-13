@@ -6,27 +6,28 @@ namespace vulkan {
 		direction = glm::vec3(0.0f, -1.0f, 0.0f);
 	}
 
-	DirectionalLight::DirectionalLight(float red, float green, float blue,
-		float aIntensity, float dIntensity,
-		float xDir, float yDir, float zDir) : Light(red, green, blue, aIntensity, dIntensity)
+	DirectionalLight::DirectionalLight(glm::vec3 position, glm::vec3 colour, float aIntensity, float dIntensity) : Light(colour, aIntensity, dIntensity)
 	{
-		direction = glm::vec3(xDir, yDir, zDir);
+		direction = position;
 	}
 
 	UniformLight DirectionalLight::getLight()
 	{
 		UniformLight light = {};
 		light.colour = colour;
-		light.direction = direction;
 		light.ambientIntensity = ambientIntensity;
 		light.diffuseIntensity = diffuseIntensity;
+		light.direction = direction;
 
 		return light;
 	}
 
-	void DirectionalLight::UpdatePosition(float xDir, float yDir, float zDir)
+	void DirectionalLight::updateLight(glm::vec3* position, glm::vec3* colour, float* ambientIntensity, float* diffuseIntensity)
 	{
-		direction = glm::vec3(xDir, yDir, zDir);
+		this->direction = *position;
+		this->colour = *colour;
+		this->diffuseIntensity = *diffuseIntensity;
+		this->ambientIntensity = *ambientIntensity;
 	}
 
 	DirectionalLight::~DirectionalLight()

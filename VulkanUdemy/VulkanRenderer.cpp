@@ -36,6 +36,8 @@ namespace vulkan {
 			createDescriptorSets();
 			createSynchronisation();
 
+			createImguiContext();
+
 		}
 		catch (const std::runtime_error& e) {
 			printf("ERROR: %s\n", e.what());
@@ -50,6 +52,9 @@ namespace vulkan {
 		int width = 0, height = 0;
 		glfwGetFramebufferSize(window->getWindow(), &width, &height);
 		while (width == 0 || height == 0) {
+
+			ImGui_ImplVulkan_SetMinImageCount(2);
+
 			glfwGetFramebufferSize(window->getWindow(), &width, &height);
 			glfwWaitEvents();
 		}
@@ -91,8 +96,12 @@ namespace vulkan {
 		}
 		meshList.clear();
 
+		delete directionalLight;
+
 		// C style memory free for dynamic descriptor sets
 		_aligned_free(modelTransferSpace);
+
+		vkDestroyDescriptorPool(mainDevice.logicalDevice, imguiDescriptorPool, nullptr);
 
 		vkDestroyDescriptorPool(mainDevice.logicalDevice, descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, descriptorSetLayout, nullptr);
@@ -136,6 +145,8 @@ namespace vulkan {
 		vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout, nullptr);
 		vkDestroyRenderPass(mainDevice.logicalDevice, renderPass, nullptr);
 
+		vkDestroyRenderPass(mainDevice.logicalDevice, imguiRenderPass, nullptr);
+
 		// Cleanup for depth buffer
 		vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView, nullptr);
 		vkDestroyImage(mainDevice.logicalDevice, depthBufferImage, nullptr);
@@ -165,6 +176,11 @@ namespace vulkan {
 		meshList[modelId].setModel(newModel);
 	}
 
+	// Our state
+	bool show_demo_window = true;
+	bool show_another_window = false;
+	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
 	void VulkanRenderer::draw(glm::mat4 projection, glm::mat4 viewMatrix)
 	{
 		// Stop running code until the fence is opened, only opened when the frame is finished drawing
@@ -176,14 +192,14 @@ namespace vulkan {
 		VkResult result = vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain, std::numeric_limits<uint64_t>::max(), imageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || frameBufferResized) {
-			frameBufferResized = false;
 			recreateSwapChain();
+			frameBufferResized = false;
+
 			return;
 		}
 		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 			throw std::runtime_error("Failed to acquire swap chain image");
 		}
-
 
 		//uboViewProjection.projection = glm::perspective(glm::radians(70.0f), (float)swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 100.0f);
 		uboViewProjection.projection = projection;
@@ -687,6 +703,8 @@ namespace vulkan {
 			int width, height;
 			glfwGetFramebufferSize(window->getWindow(), &width, &height); // Get width and height from window (glfw)
 
+			QueueFamilyIndicies indicies = getQueueFamilies(mainDevice.physicalDevice);
+
 			// Create new extent using window size
 			VkExtent2D newExtent = {};
 			newExtent.width = static_cast<uint32_t>(width);
@@ -726,7 +744,7 @@ namespace vulkan {
 		// Find optimal surface values for our swapchain
 		VkSurfaceFormatKHR surfaceFormat = chooseBestSurfaceFormat(swapChainDetails.formats);
 		VkPresentModeKHR presentMode = chooseBestPresentationMode(swapChainDetails.presentationMode);
-		VkExtent2D extent = chooseSwapExtent(swapChainDetails.surfaceCapabilities);
+		swapChainExtent = chooseSwapExtent(swapChainDetails.surfaceCapabilities);
 
 		// How many images are in the swapchain? Get 1 more than minimum to allow triple buffering
 		uint32_t imageCount = swapChainDetails.surfaceCapabilities.minImageCount + 1;
@@ -744,7 +762,7 @@ namespace vulkan {
 		swapChainCreateInfo.imageFormat = surfaceFormat.format;
 		swapChainCreateInfo.imageColorSpace = surfaceFormat.colorSpace;
 		swapChainCreateInfo.presentMode = presentMode;
-		swapChainCreateInfo.imageExtent = extent;
+		swapChainCreateInfo.imageExtent = swapChainExtent;
 		swapChainCreateInfo.minImageCount = imageCount; // Number of images in swap chain (min)
 		swapChainCreateInfo.imageArrayLayers = 1; // Number of layers for each image in chain
 		swapChainCreateInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT; // What attachment images will be used as
@@ -784,7 +802,6 @@ namespace vulkan {
 		}
 
 		swapChainImageFormat = surfaceFormat.format;
-		swapChainExtent = extent;
 
 		// Get the swapchain images
 		uint32_t swapChainImageCount = 0;
@@ -801,6 +818,48 @@ namespace vulkan {
 
 			// Add image to swapChainImages List in global namespace
 			swapChainImages.push_back(swapChainImage);
+		}
+	}
+
+	void VulkanRenderer::createImguiRenderPass()
+	{
+		VkAttachmentDescription attachment = {};
+		attachment.format = swapChainImageFormat;
+		attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+		attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachment.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+		VkAttachmentReference color_attachment = {};
+		color_attachment.attachment = 0;
+		color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+		VkSubpassDescription subpass = {};
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 1;
+		subpass.pColorAttachments = &color_attachment;
+
+		VkSubpassDependency dependency = {};
+		dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependency.dstSubpass = 0;
+		dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		dependency.srcAccessMask = 0;  // or VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+		VkRenderPassCreateInfo info = {};
+		info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		info.attachmentCount = 1;
+		info.pAttachments = &attachment;
+		info.subpassCount = 1;
+		info.pSubpasses = &subpass;
+		info.dependencyCount = 1;
+		info.pDependencies = &dependency;
+		if (vkCreateRenderPass(mainDevice.logicalDevice, &info, nullptr, &imguiRenderPass) != VK_SUCCESS) {
+			throw std::runtime_error("Could not create Dear ImGui's render pass");
 		}
 	}
 
@@ -834,7 +893,7 @@ namespace vulkan {
 		colorAttachmentResolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		colorAttachmentResolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		colorAttachmentResolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		colorAttachmentResolve.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
 		VkAttachmentReference colorAttachmentRef{};
 		colorAttachmentRef.attachment = 0;
@@ -1261,6 +1320,8 @@ namespace vulkan {
 		VkDeviceSize directionalLightBufferSize = sizeof(UniformLight);
 		VkDeviceSize cameraPositionBufferSize = sizeof(glm::vec3);
 
+		std::cout << "size of uniform light: " << (float)sizeof(UniformLight) << "\n";
+
 		// One uniform buffer for each image (and by extention, command buffer)
 		vpUniformBuffer.resize(swapChainImages.size());
 		vpUniformBufferMemory.resize(swapChainImages.size());
@@ -1338,6 +1399,32 @@ namespace vulkan {
 		result = vkCreateDescriptorPool(mainDevice.logicalDevice, &samplerPoolCreateInfo, nullptr, &samplerDescriptorPool);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create a sampler descriptor pool!");
+		}
+
+		// Imgui specific descriptor pool
+		VkDescriptorPoolSize pool_sizes[] =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+		};
+		VkDescriptorPoolCreateInfo pool_info = {};
+		pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+		pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
+		pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+		pool_info.pPoolSizes = pool_sizes;
+		result = vkCreateDescriptorPool(mainDevice.logicalDevice, &pool_info, VK_NULL_HANDLE, &imguiDescriptorPool);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create the imgui descriptor pool!");
 		}
 	}
 
@@ -1462,6 +1549,36 @@ namespace vulkan {
 
 	}
 
+	void VulkanRenderer::createImguiContext()
+	{
+		QueueFamilyIndicies indicies = getQueueFamilies(mainDevice.physicalDevice);
+
+		// IMGUI context
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+		// Setup Platform/Renderer backends
+		ImGui_ImplGlfw_InitForVulkan(window->getWindow(), true);
+		ImGui_ImplVulkan_InitInfo init_info = {};
+		init_info.Instance = instance;
+		init_info.PhysicalDevice = mainDevice.physicalDevice;
+		init_info.Device = mainDevice.logicalDevice;
+		init_info.QueueFamily = indicies.graphicsFamily;
+		init_info.Queue = graphicsQueue;
+		init_info.PipelineCache = VK_NULL_HANDLE;
+		init_info.DescriptorPool = imguiDescriptorPool;
+		init_info.Allocator = nullptr;
+		init_info.MinImageCount = 2;
+		init_info.ImageCount = swapChainImages.size();
+		init_info.CheckVkResultFn = check_vk_result;
+		ImGui_ImplVulkan_Init(&init_info, renderPass);
+
+		VkCommandBuffer commandBuffer = beginCommandBuffer(mainDevice.logicalDevice, graphicsCommandPool);
+		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
+		endAndSubmitCommandBuffer(mainDevice.logicalDevice, graphicsCommandPool, graphicsQueue, commandBuffer);
+	}
+
 	void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
 	{
 		// Copy VP data
@@ -1489,17 +1606,19 @@ namespace vulkan {
 			meshCount += 1;
 		}
 
-		std::cout << meshCount<<"\n";
-
 		// Map the list of model data
-		vkMapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex], 0, modelUniformAlignment * meshList.size(), 0, &data);
+		vkMapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex], 0, modelUniformAlignment * meshCount, 0, &data);
 		memcpy(data, modelTransferSpace, modelUniformAlignment * meshCount);
 		vkUnmapMemory(mainDevice.logicalDevice, modelDUniformBufferMemory[imageIndex]);
 
-		UniformLight light = directionalLight.getLight();
+		UniformLight light = directionalLight->getLight();
 		//std::cout << light.direction.x << " " << light.direction.y << " " << light.direction.z << "\n";
 		//std::cout << light.diffuseIntensity << "\n";
 		//std::cout << light.ambientIntensity << "\n";
+
+
+		//std::cout << "ambient intensity: " << light.ambientIntensity << "\n";
+		//std::cout << "diffuse intensity: " << light.diffuseIntensity << "\n";
 
 		vkMapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex], 0, sizeof(UniformLight), 0, &data);
 		memcpy(data, &light, sizeof(UniformLight));
@@ -1593,6 +1712,9 @@ namespace vulkan {
 			// Execute our pipeline
 			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
 		}
+
+		ImDrawData* draw_data = ImGui::GetDrawData();
+		ImGui_ImplVulkan_RenderDrawData(draw_data, commandBuffers[currentImage]);
 
 		vkCmdEndRenderPass(commandBuffers[currentImage]);
 
@@ -1868,6 +1990,17 @@ namespace vulkan {
 
 		colourImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, colourFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &colourImageMemory, msaaSamples);
 		colourImageView = createImageView(colourImage, colourFormat, VK_IMAGE_ASPECT_COLOR_BIT);
+	}
+
+	void VulkanRenderer::createDirectionalLight(glm::vec3 position, glm::vec3 colour, float ambientIntensity, float diffuseIntensity)
+	{
+		directionalLight = new DirectionalLight(position, colour, ambientIntensity, diffuseIntensity);
+	}
+
+	void VulkanRenderer::updateDirectionalLight(glm::vec3 *position, glm::vec3 *colour, float *ambientIntensity, float *diffuseIntensity)
+	{
+		if (directionalLight == nullptr) return;
+		directionalLight->updateLight(position, colour, ambientIntensity, diffuseIntensity);
 	}
 
 	stbi_uc* VulkanRenderer::loadTextureFile(std::string fileName, int* width, int* height, VkDeviceSize* imageSize)

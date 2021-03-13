@@ -15,43 +15,54 @@ layout(set = 0, binding = 1) uniform UboModel {
 	bool hasTexture;
 } uboModel;
 
-// Uniform buffer for light
-layout(set = 0, binding = 2) uniform DirectionalLight {
+
+struct Light
+{
 	vec3 colour;
-	vec3 direction;
 	float ambientIntensity;
 	float diffuseIntensity;
+};
+// Uniform buffer for light
+layout(set = 0, binding = 2) uniform DirectionalLight {
+	Light base;
+	vec3 direction;
 } directionalLight;
 
 layout(set = 0, binding = 3) uniform CameraPosition {
 	vec3 cameraPos;	
 } cameraPosition;
 
-vec4 CalcDirectionalLight()
+vec4 CalcLightByDirection(Light light, vec3 direction)
 {
-	vec4 ambientColour = vec4(directionalLight.colour, 1.0f) * 0.4;
+	vec4 ambientColour = vec4(light.colour, 1.0f) * light.ambientIntensity;
 	
 	vec3 normal = normalize(Normal);
-	vec3 lightDir = -normalize(directionalLight.direction - FragPos);
+	vec3 lightDir = normalize(direction - FragPos);
 	
-	float diffuseFactor = max(dot(normal, -lightDir), 0.0f);
-	vec4 diffuseColour = vec4(directionalLight.colour * 1.0 * diffuseFactor, 1.0f);
+	float diffuseFactor = max(dot(normal, lightDir), 0.0f);
+	vec4 diffuseColour = vec4(light.colour * light.diffuseIntensity * diffuseFactor, 1.0f);
 	
 	vec4 specularColour = vec4(0, 0, 0, 0);
 	if(diffuseFactor > 0.0f)
 	{
 		vec3 fragToEye = normalize(cameraPosition.cameraPos - FragPos);
-		vec3 reflectedVertex = normalize(reflect(lightDir, normal));
+		vec3 reflectedVertex = normalize(reflect(-lightDir, normal));
 		
 		float specularFactor = dot(fragToEye, reflectedVertex);
 		if(specularFactor > 0.0f)
 		{
 			specularFactor = pow(specularFactor, 128);
-			specularColour = vec4(directionalLight.colour * 0.5 * specularFactor, 1.0f);
+			specularColour = vec4(light.colour * 0.5 * specularFactor, 1.0f);
 		}
 	}
 	
 	return (ambientColour + diffuseColour + specularColour);
+}
+
+vec4 CalcDirectionalLight()
+{
+	//float shadowFactor = CalcDirectionalShadowFactor();
+	return CalcLightByDirection(directionalLight.base, directionalLight.direction);
 }
 
 void main() 
@@ -71,8 +82,10 @@ void main()
 		//if(directionalLight.direction.y <= 0) bug=1.0;
 
 		//outColour.x+=bug;
+		//outColour = vec4(0,0,directionalLight.ambientIntensity,1);
 	}
 	else {
+		//outColour = vec4(0,0,1,1);
 		outColour = vec4(fragCol, 1.0);
 	}
 }

@@ -4,9 +4,10 @@
 namespace vulkan {
     struct UniformLight {
         glm::vec3 colour;
-        glm::vec3 direction;
         float ambientIntensity;
         float diffuseIntensity;
+        glm::vec3 direction;
+
     };
 
     class DirectionalLight :
@@ -15,13 +16,11 @@ namespace vulkan {
     public:
         DirectionalLight();
 
-        DirectionalLight(float red, float green, float blue,
-            float aIntensity, float dIntensity,
-            float xDir, float yDir, float zDir);
+        DirectionalLight(glm::vec3 position, glm::vec3 colour, float aIntensity, float dIntensity);
 
         UniformLight getLight();
 
-        void UpdatePosition(float xDir, float yDir, float zDir);
+        void updateLight(glm::vec3* position, glm::vec3* colour, float *ambientIntensity, float *diffuseIntensity);
 
         ~DirectionalLight();
 

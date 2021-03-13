@@ -9,9 +9,9 @@ namespace vulkan {
 		diffuseIntensity = 0.0f;
 	}
 
-	Light::Light(float red, float green, float blue, float aIntensity, float dIntensity)
+	Light::Light(glm::vec3 colour, float aIntensity, float dIntensity)
 	{
-		colour = glm::vec3(red, green, blue);
+		this->colour = colour;
 		ambientIntensity = aIntensity;
 
 		diffuseIntensity = dIntensity;

@@ -2,6 +2,9 @@
 
 #define GLFW_INCLUDE_VULKAN
 
+#include "imgui.h"
+#include "backends/imgui_impl_vulkan.h"
+
 #include <vector>
 #include <iostream>
 #include <fstream>
@@ -13,6 +16,15 @@
 namespace vulkan {
 	const int MAX_FRAME_DRAWS = 2;
 	const int MAX_OBJECTS = 20;
+
+	static void check_vk_result(VkResult err)
+	{
+		if (err == 0)
+			return;
+		fprintf(stderr, "[vulkan] Error: VkResult = %d\n", err);
+		if (err < 0)
+			abort();
+	};
 
 	const std::vector<const char*> deviceExtensions = {
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME
