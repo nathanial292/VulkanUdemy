@@ -26,10 +26,6 @@
 #include <algorithm>
 #include <array>
 
-//#define IMGUI_UNLIMITED_FRAME_RATE
-#ifdef _DEBUG
-#define IMGUI_VULKAN_DEBUG_REPORT
-#endif
 
 namespace vulkan {
 	class VulkanRenderer
@@ -58,7 +54,6 @@ namespace vulkan {
 		void createSwapChain();
 		void createDepthBufferImage();
 		void createRenderPass();
-		void createImguiRenderPass();
 		void createDescriptorSetLayout();
 		void createPushConstantRange();
 		void createGraphicsPipeline();
@@ -71,7 +66,6 @@ namespace vulkan {
 		void createDescriptorSets();
 		void createTextureSampler();
 
-		void createImguiContext();
 
 		// Recreate functions
 		void recreateSwapChain();
@@ -193,9 +187,9 @@ namespace vulkan {
 		VkSwapchainKHR swapchain;
 		std::vector<SwapChainImage> swapChainImages;
 		std::vector<VkFramebuffer> swapChainFramebuffers;
-		std::vector<VkFramebuffer> imguiFrameBuffers;
+
 		std::vector<VkCommandBuffer> commandBuffers;
-		std::vector<VkCommandBuffer> imguiCommandBuffers;
+
 
 		// Depth buffer class members
 		VkImage depthBufferImage;
@@ -225,13 +219,13 @@ namespace vulkan {
 		// Pipeline
 		VkPipelineLayout pipelineLayout;
 		VkRenderPass renderPass;
-		VkRenderPass imguiRenderPass;
+
 
 		VkPipeline graphicsPipeline;
 
 		// Pools
 		VkCommandPool graphicsCommandPool;
-		VkCommandPool imguiCommandPool;
+
 
 		// Utility
 		VkFormat swapChainImageFormat;
@@ -251,7 +245,6 @@ namespace vulkan {
 
 		VkDescriptorPool descriptorPool;
 		VkDescriptorPool samplerDescriptorPool;
-		VkDescriptorPool imguiDescriptorPool;
 		std::vector<VkDescriptorSet> descriptorSets;
 		std::vector<VkDescriptorSet> samplerDescriptorSets;
 
