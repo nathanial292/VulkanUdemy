@@ -39,8 +39,8 @@ namespace vulkan {
 
 		int init(Window* window, Camera* camera);
 
-		void updateModel(int modelId, glm::mat4 newModel);
-		void updateModelMesh(int modelId, glm::mat4 newModel);
+		void updateModel(int modelId, glm::mat4 *newModel);
+		void updateModelMesh(int modelId, glm::mat4 *newModel);
 
 		void draw(glm::mat4 projection, glm::mat4 viewMatrix);
 		void cleanup();
@@ -92,6 +92,30 @@ namespace vulkan {
 		}
 		void setDirectionalLight(DirectionalLight* light) {
 			directionalLight = light;
+		}
+		void setMultiSampleLevel(int level)
+		{
+			if (level % 2 == 0 || level == 1) {
+				std::cout << level;
+				if (level == 1) msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+				if (level == 2) msaaSamples = VK_SAMPLE_COUNT_2_BIT;
+				if (level == 4) msaaSamples = VK_SAMPLE_COUNT_4_BIT;
+				if (level == 8) msaaSamples = VK_SAMPLE_COUNT_8_BIT;
+
+				recreateSwapChain();
+			}
+		}
+		void setTextureStateModel(int modelIndex, bool state)
+		{
+			if (modelIndex > modelList.size() - 1) return;
+			modelList[modelIndex].setTexture(state);
+			int meshCount = modelList[modelIndex].getMeshCount();
+			for (int i = 0; i < meshCount; i++) modelList[modelIndex].getMesh(i)->setTexture(state);
+		}
+		void setTextureStateMesh(int meshIndex, bool state)
+		{
+			if (meshIndex > meshList.size() - 1) return;
+			meshList[meshIndex].setTexture(state);
 		}
 
 		// Allocate Functions
@@ -241,6 +265,15 @@ namespace vulkan {
 		std::vector<VkBuffer> modelDUniformBuffer;
 		std::vector<VkDeviceMemory> modelDUniformBufferMemory;
 		size_t modelUniformAlignment;
+
+		struct ModelTest {
+			glm::mat4 model;
+			glm::mat4 inverseModel;
+			bool hasTexture;
+			glm::mat3 a;
+			glm::vec4 c;
+			glm::vec4 d;
+		};
 		Model* modelTransferSpace;
 
 		std::vector<VkBuffer> directionalLightUniformBuffer;

@@ -8,7 +8,11 @@
 namespace vulkan {
 	struct Model {
 		glm::mat4 model;
+		glm::mat4 inverseModel;
 		bool hasTexture;
+		glm::mat3 a;//dynamic descriptors reeee (has to be lined up to minoffset) (it should be but it doesn't work thonk)
+		glm::vec4 c;
+		glm::vec4 d;
 	};
 
 	class Mesh
@@ -42,6 +46,11 @@ namespace vulkan {
 
 		void setModel(glm::mat4 newModel);
 		Model getModel();
+
+		void setTexture(bool state)
+		{
+			model.hasTexture = state;
+		}
 
 		~Mesh();
 	private:

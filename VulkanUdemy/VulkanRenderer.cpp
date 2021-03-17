@@ -7,6 +7,7 @@ namespace vulkan {
 
 	VulkanRenderer::~VulkanRenderer()
 	{
+		cleanup();
 	}
 
 	int VulkanRenderer::init(Window* newWindow, Camera* newCamera)
@@ -36,9 +37,9 @@ namespace vulkan {
 			createDescriptorPool();
 			createDescriptorSets();
 			createSynchronisation();
-
 			createImguiContext();
 
+			directionalLight = new DirectionalLight();
 		}
 		catch (const std::runtime_error& e) {
 			printf("ERROR: %s\n", e.what());
@@ -63,24 +64,17 @@ namespace vulkan {
 		createDepthBufferImage();
 		createColourImage();
 		createRenderPass();
+		createImguiRenderPass();
 		createGraphicsPipeline();
 		createFrameBuffers();
 		createCommandBuffers();
+		createImguiContext();
 	}
 
 	void VulkanRenderer::cleanup()
 	{
 		// Clean up all components of the swapchain, render pass, graphics pipeline, command buffers, image views
 		cleanupSwapChain();
-
-		for (size_t i = 0; i < textureImages.size(); i++) {
-			vkDestroyImage(mainDevice.logicalDevice, textureImages[i], nullptr);
-			vkFreeMemory(mainDevice.logicalDevice, textureImageMemory[i], nullptr);
-			vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
-		}
-		textureImages.clear();
-		textureImageViews.clear();
-		textureImageMemory.clear();
 
 		vkDestroyDescriptorPool(mainDevice.logicalDevice, samplerDescriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(mainDevice.logicalDevice, samplerSetLayout, nullptr);
@@ -124,7 +118,6 @@ namespace vulkan {
 		vkDestroyCommandPool(mainDevice.logicalDevice, graphicsCommandPool, nullptr);
 		vkDestroyCommandPool(mainDevice.logicalDevice, imguiCommandPool, nullptr);
 
-
 		vkDestroySurfaceKHR(instance, surface, nullptr);
 		if (enableValidationLayers) {
 			destroyDebugMessenger(nullptr);
@@ -161,6 +154,15 @@ namespace vulkan {
 		vkDestroyImage(mainDevice.logicalDevice, colourImage, nullptr);
 		vkFreeMemory(mainDevice.logicalDevice, colourImageMemory, nullptr);
 
+		for (size_t i = 0; i < textureImages.size(); i++) {
+			vkDestroyImage(mainDevice.logicalDevice, textureImages[i], nullptr);
+			vkFreeMemory(mainDevice.logicalDevice, textureImageMemory[i], nullptr);
+			vkDestroyImageView(mainDevice.logicalDevice, textureImageViews[i], nullptr);
+		}
+		textureImages.clear();
+		textureImageViews.clear();
+		textureImageMemory.clear();
+
 		for (auto image : swapChainImages) {
 			//vkDestroyImage(mainDevice.logicalDevice, image.image, nullptr);
 			vkDestroyImageView(mainDevice.logicalDevice, image.imageView, nullptr);
@@ -169,15 +171,15 @@ namespace vulkan {
 		vkDestroySwapchainKHR(mainDevice.logicalDevice, swapchain, nullptr);
 	}
 
-	void VulkanRenderer::updateModel(int modelId, glm::mat4 newModel)
+	void VulkanRenderer::updateModel(int modelId, glm::mat4 *newModel)
 	{
 		if (modelId >= modelList.size()) return;
-		modelList[modelId].setModel(newModel);
+		modelList[modelId].setModel(*newModel);
 	}
 
-	void VulkanRenderer::updateModelMesh(int modelId, glm::mat4 newModel) {
+	void VulkanRenderer::updateModelMesh(int modelId, glm::mat4 *newModel) {
 		if (modelId >= meshList.size()) return;
-		meshList[modelId].setModel(newModel);
+		meshList[modelId].setModel(*newModel);
 	}
 
 	// Our state
@@ -456,8 +458,11 @@ namespace vulkan {
 		// Calculate alignment of model data
 		modelUniformAlignment = (sizeof(Model) + minUniformBufferOffset - 1) & ~(minUniformBufferOffset - 1);
 
+		std::cout << sizeof(Model) << " " << minUniformBufferOffset << " " << modelUniformAlignment;
+
 		// Create space in memory to hold dynamic buffer that is aligned to required alignment and holds MAX_OBJECTS
 		modelTransferSpace = (Model*)_aligned_malloc(modelUniformAlignment * MAX_OBJECTS, modelUniformAlignment);
+
 	}
 
 	bool VulkanRenderer::checkInstanceExtensionSupport(std::vector<const char*>* checkExtensions)
@@ -997,16 +1002,16 @@ namespace vulkan {
 		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[1].offset = offsetof(Vertex, col);
 
-		// Color Attribute
+		// Texture Attribute
 		attributeDescriptions[2].binding = 0;
 		attributeDescriptions[2].location = 2;
 		attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
 		attributeDescriptions[2].offset = offsetof(Vertex, tex);
 
-		// Color Attribute
+		// Normal Attribute
 		attributeDescriptions[3].binding = 0;
 		attributeDescriptions[3].location = 3;
-		attributeDescriptions[3].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[3].format = VK_FORMAT_R32G32B32_SFLOAT;
 		attributeDescriptions[3].offset = offsetof(Vertex, normal);
 
 		// Vertex Input
@@ -1065,7 +1070,7 @@ namespace vulkan {
 		rasterizerStateCreateInfo.rasterizerDiscardEnable = VK_FALSE; // Whether to discard data and skip rasterizer. Never creates fragements
 		rasterizerStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL; // How to handle filling points between vertices
 		rasterizerStateCreateInfo.lineWidth = 1.0f; // The thickness of the lines when drawn (enable wide lines for anything other than 1.0f)
-		rasterizerStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+		rasterizerStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
 		rasterizerStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // Winding to determine which side is front
 		rasterizerStateCreateInfo.depthBiasEnable = VK_FALSE; // Whether to add depth bias to fragments (good for stopping "shadow achne" in shadow mapping)
 
@@ -1350,7 +1355,7 @@ namespace vulkan {
 	void VulkanRenderer::createPushConstantRange()
 	{
 		// Define push constant values
-		pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT; // Shader stage push constant will go to
+		pushConstantRange.stageFlags = VK_SHADER_STAGE_ALL_GRAPHICS; // Shader stage push constant will go to
 		pushConstantRange.offset = 0; // Offset into given data to pass push constant
 		pushConstantRange.size = sizeof(Model);
 	}
@@ -1363,7 +1368,7 @@ namespace vulkan {
 		VkDeviceSize directionalLightBufferSize = sizeof(UniformLight);
 		VkDeviceSize cameraPositionBufferSize = sizeof(glm::vec3);
 
-		std::cout << "size of uniform light: " << (float)sizeof(UniformLight) << "\n";
+		//std::cout << "size of uniform light: " << (float)sizeof(UniformLight) << "\n";
 
 		// One uniform buffer for each image (and by extention, command buffer)
 		vpUniformBuffer.resize(swapChainImages.size());
@@ -1618,9 +1623,9 @@ namespace vulkan {
 		init_info.CheckVkResultFn = check_vk_result;
 		ImGui_ImplVulkan_Init(&init_info, imguiRenderPass);
 
-		VkCommandBuffer commandBuffer = beginCommandBuffer(mainDevice.logicalDevice, graphicsCommandPool);
+		VkCommandBuffer commandBuffer = beginCommandBuffer(mainDevice.logicalDevice, imguiCommandPool);
 		ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-		endAndSubmitCommandBuffer(mainDevice.logicalDevice, graphicsCommandPool, graphicsQueue, commandBuffer);
+		endAndSubmitCommandBuffer(mainDevice.logicalDevice, imguiCommandPool, graphicsQueue, commandBuffer);
 	}
 
 	void VulkanRenderer::updateUniformBuffers(uint32_t imageIndex)
@@ -1660,11 +1665,12 @@ namespace vulkan {
 		//std::cout << "colour :" << light.colour.x << " " << light.colour.y << " " << light.colour.z << "\n";
 		//std::cout << "ambient intensity: " << light.ambientIntensity << "\n";
 		//std::cout << "diffuse intensity: " << light.diffuseIntensity << "\n";
-		std::cout << "size of light :" << sizeof(light.ambientIntensity) << "\n";
+		//std::cout << "size of light :" << sizeof(light.ambientIntensity) << "\n";
 
 		vkMapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex], 0, 32, 0, &data);
 		memcpy(data, &light, 32);
 		vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
+		
 
 		glm::vec3 cameraPosition = camera->getCameraPosition();
 		//std::cout << "CAMERA POSITION" << "\n";
@@ -1708,10 +1714,10 @@ namespace vulkan {
 
 		for (size_t j = 0; j < modelList.size(); j++) {
 			MeshModel thisModel = modelList[j];
-			glm::mat4 model = thisModel.getModel();
-			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &model);
 
 			for (size_t k = 0; k < thisModel.getMeshCount(); k++) {
+				//Model model = thisModel.getMesh(k)->getModel();
+				Model model = thisModel.getModel();
 				// Bind our vertex buffer
 				VkBuffer vertexBuffers[] = { thisModel.getMesh(k)->getVertexBuffer() }; // Buffers to bind
 				VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
@@ -1726,6 +1732,8 @@ namespace vulkan {
 				// Bind descriptor sets
 				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+
+				vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
 
 				// Execute our pipeline
 				vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
@@ -1749,13 +1757,23 @@ namespace vulkan {
 			vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
 				0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
 
-			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(Model), &thisModel.model);
+			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
 
 			// Execute our pipeline
 			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
 		}
 
 		vkCmdEndRenderPass(commandBuffers[currentImage]);
+
+		result = vkEndCommandBuffer(commandBuffers[currentImage]);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to stop recording to a command buffer!");
+		}
+
+		result = vkBeginCommandBuffer(imguiCommandBuffers[currentImage], &bufferBeginInfo);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to start recording to a command buffer!");
+		}
 
 		VkRenderPassBeginInfo info = {};
 		info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1769,13 +1787,13 @@ namespace vulkan {
 		info.pClearValues = clearValuesImgui.data(); // List of clear values
 		info.clearValueCount = static_cast<uint32_t>(clearValuesImgui.size());
 
-		vkCmdBeginRenderPass(commandBuffers[currentImage], &info, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(imguiCommandBuffers[currentImage], &info, VK_SUBPASS_CONTENTS_INLINE);
 
-			ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffers[currentImage]);
+		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), imguiCommandBuffers[currentImage]);
 
-		vkCmdEndRenderPass(commandBuffers[currentImage]);
+		vkCmdEndRenderPass(imguiCommandBuffers[currentImage]);
 
-		result = vkEndCommandBuffer(commandBuffers[currentImage]);
+		result = vkEndCommandBuffer(imguiCommandBuffers[currentImage]);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to stop recording to a command buffer!");
 		}
@@ -1843,7 +1861,6 @@ namespace vulkan {
 		imageCreateInfo.tiling = tiling; // How image data should be tiled, (arranged for optimal reading)
 		imageCreateInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Layout of image data on creation
 		imageCreateInfo.usage = useFlags; // Being used as a depth buffer attachment (Bit flag defining what image will be used for)
-		imageCreateInfo.samples = VK_SAMPLE_COUNT_1_BIT; // Number of samples for multisamples
 		imageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE; // Whether image can be shared between queues
 		imageCreateInfo.samples = numSamples;
 
@@ -2056,6 +2073,7 @@ namespace vulkan {
 
 	void VulkanRenderer::updateDirectionalLight(glm::vec3 *position, glm::vec3 *colour, float *ambientIntensity, float *diffuseIntensity)
 	{
+		if (directionalLight == nullptr) return;
 		directionalLight->updateLight(position, colour, ambientIntensity, diffuseIntensity);
 	}
 

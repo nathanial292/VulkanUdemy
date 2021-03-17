@@ -14,8 +14,12 @@ namespace vulkan {
 		size_t getMeshCount();
 		Mesh* getMesh(size_t index);
 
-		glm::mat4 getModel();
+		Model getModel() { return model; }
 		void setModel(glm::mat4 newModel);
+		void setTexture(bool state)
+		{
+			model.hasTexture = state;
+		}
 
 		static std::vector<std::string> LoadMaterials(const aiScene* scene);
 		static std::vector<Mesh> LoadNode(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, aiNode* node, const aiScene* scene, std::vector<int> matToTex);
@@ -24,6 +28,6 @@ namespace vulkan {
 
 	private:
 		std::vector<Mesh> meshList;
-		glm::mat4 model;
+		Model model;
 	};
 }

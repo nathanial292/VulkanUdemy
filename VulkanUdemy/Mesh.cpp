@@ -21,6 +21,7 @@ namespace vulkan {
 		createIndexBuffer(transferQueue, transferCommandPool, indices);
 
 		model.model = glm::mat4(1.0f);
+		model.inverseModel = glm::mat4(1.0f);
 		model.hasTexture = true;
 		texId = newTexId;
 	}
@@ -35,6 +36,7 @@ namespace vulkan {
 		createIndexBuffer(transferQueue, transferCommandPool, indices);
 
 		model.model = glm::mat4(1.0f);
+		model.inverseModel = glm::mat4(1.0f);
 		model.hasTexture = false;
 	}
 
@@ -75,6 +77,7 @@ namespace vulkan {
 	void Mesh::setModel(glm::mat4 newModel)
 	{
 		model.model = newModel;
+		model.inverseModel = glm::transpose(glm::inverse(newModel));
 	}
 
 	Model Mesh::getModel()

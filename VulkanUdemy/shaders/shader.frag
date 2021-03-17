@@ -12,8 +12,15 @@ layout(location = 0) out vec4 outColour; 	// Final output colour (must also have
 // Dynamic buffers
 layout(set = 0, binding = 1) uniform UboModel {
 	mat4 model;
+	mat4 inverseModel;
 	bool hasTexture;
 } uboModel;
+
+layout(push_constant) uniform PushModel {
+	mat4 model;
+	mat4 inverseModel;
+	bool hasTexture;
+} pushModel;
 
 // Uniform buffer for light
 layout(set = 0, binding = 2) uniform DirectionalLight {
@@ -58,7 +65,7 @@ vec4 CalcLightByDirection()
 		}
 	}
 	
-	return (ambientColour + diffuseColour + specularColour);
+	return (ambientColour + (1.0 - 0.0) * (diffuseColour + specularColour));
 }
 
 vec4 CalcDirectionalLight()
@@ -70,7 +77,7 @@ vec4 CalcDirectionalLight()
 void main() 
 {
 	vec4 finalColour = CalcDirectionalLight();		
-	if (uboModel.hasTexture) {
+	if (pushModel.hasTexture) {
 		outColour = texture(textureSampler, fragTex) * finalColour;
 		
 		//vec3 normal = normalize(Normal);
@@ -88,6 +95,6 @@ void main()
 	}
 	else {
 		//outColour = vec4(0,0,1,1);
-		outColour = vec4(fragCol, 1.0);
+		outColour = vec4(fragCol, 1.0) * finalColour;
 	}
 }

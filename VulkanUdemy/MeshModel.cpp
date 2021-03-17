@@ -4,7 +4,9 @@ namespace vulkan {
 	MeshModel::MeshModel(std::vector<Mesh> newMeshList)
 	{
 		meshList = newMeshList;
-		model = glm::mat4(1.0f);
+		model.model = glm::mat4(1.0f);
+		model.inverseModel = glm::mat4(1.0f);
+		model.hasTexture = false;
 	}
 
 	MeshModel::~MeshModel()
@@ -25,14 +27,10 @@ namespace vulkan {
 		return &meshList[index];
 	}
 
-	glm::mat4 MeshModel::getModel()
-	{
-		return model;
-	}
-
 	void MeshModel::setModel(glm::mat4 newModel)
 	{
-		model = newModel;
+		model.model = newModel;
+		model.inverseModel = glm::transpose(glm::inverse(newModel));
 	}
 
 	std::vector<std::string> MeshModel::LoadMaterials(const aiScene* scene)
@@ -85,6 +83,7 @@ namespace vulkan {
 		std::vector<uint32_t> indices;
 
 		vertices.resize(mesh->mNumVertices);
+		std::cout << vertices[0].normal.x << " " << vertices[0].normal.y << " " << vertices[0].normal.z << ",";
 		for (size_t i = 0; i < mesh->mNumVertices; i++) {
 			// Set position
 			vertices[i].pos = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
@@ -98,9 +97,11 @@ namespace vulkan {
 			}
 			vertices[i].col = { 1.0f, 1.0f, 1.0f };
 			vertices[i].normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-			//calcAverageNormals(&indices, &vertices);
 
-			//std::cout << vertices[i].normal.x << " " << vertices[i].normal.y << " " << vertices[i].normal.z;
+			//std::cout << vertices[i].pos.x << vertices[i].pos.y << vertices[i].pos.z;
+			//std::cout << vertices[i].col.x << vertices[i].col.y << vertices[i].col.z;
+			//std::cout << vertices[i].tex.x << vertices[i].tex.y;
+			//std::cout << vertices[i].normal.x << vertices[i].normal.y << vertices[i].normal.z;
 		}
 
 		// Go through faces indicies and add to list
