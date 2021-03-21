@@ -15,7 +15,7 @@
 
 namespace vulkan {
 	const int MAX_FRAME_DRAWS = 2;
-	const int MAX_OBJECTS = 100;
+	const int MAX_OBJECTS = 200;
 
 	static void check_vk_result(VkResult err)
 	{
@@ -63,7 +63,7 @@ namespace vulkan {
 #ifdef NDEBUG
 	const bool enableValidationLayers = false;
 #else
-	const bool enableValidationLayers = true;
+	const bool enableValidationLayers = false;
 #endif
 
 	// Callback function for validation debugging (will be called when validation information record)

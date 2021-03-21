@@ -6,11 +6,6 @@ namespace vulkan {
 
 	}
 
-	Mesh::~Mesh()
-	{
-
-	}
-
 	Mesh::Mesh(VkPhysicalDevice newPhysicalDevice, VkDevice newDevice, VkQueue transferQueue, VkCommandPool transferCommandPool, std::vector<uint32_t>* indices, std::vector<Vertex>* vertices, int newTexId)
 	{
 		indexCount = indices->size();
@@ -141,4 +136,8 @@ namespace vulkan {
 
 	}
 
+	Mesh::~Mesh()
+	{
+
+	}
 }

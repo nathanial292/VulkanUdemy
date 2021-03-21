@@ -440,8 +440,8 @@ namespace vulkan {
 			if (checkDeviceSuitable(device))
 			{
 				mainDevice.physicalDevice = device;
-				msaaSamples = getMaxUseableSampleCount();
-				//msaaSamples = VK_SAMPLE_COUNT_1_BIT;
+				//msaaSamples = getMaxUseableSampleCount();
+				msaaSamples = VK_SAMPLE_COUNT_8_BIT;
 				break;
 			}
 		}
@@ -1079,6 +1079,8 @@ namespace vulkan {
 		multisampleCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 		multisampleCreateInfo.sampleShadingEnable = VK_FALSE; // Enable multisample shading or not
 		multisampleCreateInfo.rasterizationSamples = msaaSamples; // Number of samples to use per fragment
+		multisampleCreateInfo.sampleShadingEnable = VK_TRUE; // enable sample shading in the pipeline
+		multisampleCreateInfo.minSampleShading = 1.0f; // min fraction for sample shading; closer to one is smooth
 
 		VkPipelineColorBlendAttachmentState colorBlendAttachment{};
 		colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
@@ -1751,11 +1753,19 @@ namespace vulkan {
 			// Dynamic offset amount
 			uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
 
-			std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
-
-			// Bind descriptor sets
-			vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-				0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+			if (thisModel.hasTexture)
+			{
+				std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
+				// Bind descriptor sets
+				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+			}
+			else {
+				std::array<VkDescriptorSet, 1> descriptorSetGroup = { descriptorSets[currentImage] };
+				// Bind descriptor sets
+				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+			}
 
 			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
 
@@ -2042,6 +2052,14 @@ namespace vulkan {
 		return meshModel;
 	}
 
+	int VulkanRenderer::createModel(const char* modelName)
+	{
+		MeshModel model = createMeshModel(modelName, NULL);
+		modelList.push_back(model);
+
+		return modelList.size() - 1;
+	}
+
 	int VulkanRenderer::createModel(const char* modelName, const char* textureName)
 	{
 		MeshModel model = createMeshModel(modelName, createTexture(textureName));
@@ -2053,6 +2071,14 @@ namespace vulkan {
 	int VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices, const char* fileName)
 	{
 		Mesh mesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &indices, &vertices, createTexture(fileName));
+		meshList.push_back(mesh);
+
+		return meshList.size() - 1;
+	}
+
+	int VulkanRenderer::createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices)
+	{
+		Mesh mesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &indices, &vertices);
 		meshList.push_back(mesh);
 
 		return meshList.size() - 1;
