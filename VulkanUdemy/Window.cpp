@@ -106,5 +106,5 @@ void Window::mouse_callback(GLFWwindow* window, double xpos, double ypos)
 void Window::framebufferResizeCallback(GLFWwindow* window, int width, int height)
 {
 	auto app = reinterpret_cast<Window*>(glfwGetWindowUserPointer(window));
-	app->frameBufferResized = true;
+	//app->frameBufferResized = true;
 }

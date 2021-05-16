@@ -24,11 +24,6 @@ public:
 	GLfloat getXChange();
 	GLfloat getYChange();
 
-	void setFrameBufferResize(bool flag) {
-		frameBufferResized = flag;
-	}
-	bool getFrameBufferResized() { return frameBufferResized; }
-
 	GLFWwindow* getWindow() { return mainWindow; }
 
 	void cleanUp() {
@@ -43,8 +38,6 @@ private:
 
 	GLint width, height;
 	GLint bufferWidth, bufferHeight;
-
-	bool frameBufferResized = false;
 
 	bool keys[1024] = { 0 };
 
