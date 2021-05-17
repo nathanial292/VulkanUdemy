@@ -24,11 +24,13 @@ namespace vulkan {
 			createDepthBufferImage();
 			createColourImage();
 			createRenderPass();
+			createOffscreenRenderPass(); // Shadow renderpass
 			createImguiRenderPass();
 			createDescriptorSetLayout();
 			createPushConstantRange();
 			createGraphicsPipeline();
 			createFrameBuffers();
+			createOffscreenFrameBuffer(); // Shadow framebuffer
 			createCommandPool();
 			allocateDynamicBufferTransferSpace();
 			createUniformBuffers();
@@ -210,6 +212,12 @@ namespace vulkan {
 		uboViewProjection.projection = projection;
 		uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
 		uboViewProjection.view = viewMatrix;
+
+		glm::mat4 depthProjectionMatrix = glm::perspective(glm::radians(45.0f), 1.0f, 1.0f, 96.0f);
+		glm::mat4 depthViewMatrix = glm::lookAt(directionalLight->getPosition(), glm::vec3(0.0f), glm::vec3(0, 1, 0));
+		glm::mat4 depthModelMatrix = glm::mat4(1.0f);
+		uboViewProjection.lightTransform = depthProjectionMatrix * depthViewMatrix * depthModelMatrix;
+
 		recordCommands(imageIndex); // Rerecord commands every draw
 		updateUniformBuffers(imageIndex);
 
@@ -951,11 +959,65 @@ namespace vulkan {
 		}
 	}
 
+	void VulkanRenderer::createOffscreenRenderPass()
+	{
+		VkAttachmentDescription attachmentDescription = {};
+		attachmentDescription.format = VK_FORMAT_D16_UNORM;
+		attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+		attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;							// Clear depth at beginning of the render pass
+		attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;						// We will read from depth, so it's important to store the depth attachment results
+		attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		attachmentDescription.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;					// We don't care about initial layout of the attachment
+		attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;// Attachment will be transitioned to shader read at render pass end
+
+		VkAttachmentReference depthReference = {};
+		depthReference.attachment = 0;
+		depthReference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;			// Attachment will be used as depth/stencil during render pass
+
+		VkSubpassDescription subpass = {};
+		subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+		subpass.colorAttachmentCount = 0;													// No color attachments
+		subpass.pDepthStencilAttachment = &depthReference;									// Reference to our depth attachment
+
+		// Use subpass dependencies for layout transitions
+		std::array<VkSubpassDependency, 2> dependencies;
+
+		dependencies[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[0].dstSubpass = 0;
+		dependencies[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dependencies[0].dstStageMask = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+		dependencies[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dependencies[0].dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dependencies[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		dependencies[1].srcSubpass = 0;
+		dependencies[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+		dependencies[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+		dependencies[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		dependencies[1].srcAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dependencies[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		dependencies[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+
+		VkRenderPassCreateInfo renderPassCreateInfo = {};
+		renderPassCreateInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+		renderPassCreateInfo.attachmentCount = 1;
+		renderPassCreateInfo.pAttachments = &attachmentDescription;
+		renderPassCreateInfo.subpassCount = 1;
+		renderPassCreateInfo.pSubpasses = &subpass;
+		renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
+		renderPassCreateInfo.pDependencies = dependencies.data();
+
+		if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassCreateInfo, nullptr, &shadowRenderPass) != VK_SUCCESS) {
+			throw std::runtime_error("failed to create render pass!");
+		}
+	}
+
 	void VulkanRenderer::createGraphicsPipeline()
 	{
 		// Read in SPIR-V code of shaders
-		auto vertexShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/vert.spv");
-		auto fragShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/frag.spv");
+		auto vertexShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/shader.vert.spv");
+		auto fragShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/shader.frag.spv");
 
 		// Build shader Modules to link to graphics pipeline
 		VkShaderModule vertShaderModule = createShaderModule(vertexShaderCode);
@@ -1050,7 +1112,6 @@ namespace vulkan {
 		viewportStateCreateInfo.scissorCount = 1;
 		viewportStateCreateInfo.pScissors = &scissor;
 
-		/*
 		// Dyanamic states to enable (Change values in runtime instead of hardcoding pipeline)
 		std::vector<VkDynamicState> dyanamicStateEnables;
 		dyanamicStateEnables.push_back(VK_DYNAMIC_STATE_VIEWPORT); // Dynamic Viewport: Can resize in command buffer with vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
@@ -1061,7 +1122,6 @@ namespace vulkan {
 		dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dyanamicStateEnables.size());
 		dynamicStateCreateInfo.pDynamicStates = dyanamicStateEnables.data();
-		*/
 
 		// Rasterizer
 		VkPipelineRasterizationStateCreateInfo rasterizerStateCreateInfo = {};
@@ -1070,14 +1130,13 @@ namespace vulkan {
 		rasterizerStateCreateInfo.rasterizerDiscardEnable = VK_FALSE; // Whether to discard data and skip rasterizer. Never creates fragements
 		rasterizerStateCreateInfo.polygonMode = VK_POLYGON_MODE_FILL; // How to handle filling points between vertices
 		rasterizerStateCreateInfo.lineWidth = 1.0f; // The thickness of the lines when drawn (enable wide lines for anything other than 1.0f)
-		rasterizerStateCreateInfo.cullMode = VK_CULL_MODE_NONE;
+		rasterizerStateCreateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
 		rasterizerStateCreateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE; // Winding to determine which side is front
 		rasterizerStateCreateInfo.depthBiasEnable = VK_FALSE; // Whether to add depth bias to fragments (good for stopping "shadow achne" in shadow mapping)
 
 		// Multisampling
 		VkPipelineMultisampleStateCreateInfo multisampleCreateInfo = {};
 		multisampleCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-		multisampleCreateInfo.sampleShadingEnable = VK_FALSE; // Enable multisample shading or not
 		multisampleCreateInfo.rasterizationSamples = msaaSamples; // Number of samples to use per fragment
 		multisampleCreateInfo.sampleShadingEnable = VK_TRUE; // enable sample shading in the pipeline
 		multisampleCreateInfo.minSampleShading = 1.0f; // min fraction for sample shading; closer to one is smooth
@@ -1098,7 +1157,7 @@ namespace vulkan {
 		colorBlending.blendConstants[3] = 0.0f;
 
 		// Pipeline layout (descriptor sets and push constants)
-		std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts = { descriptorSetLayout, samplerSetLayout };
+		std::array<VkDescriptorSetLayout, 3> descriptorSetLayouts = { descriptorSetLayout, samplerSetLayout, shadowSetLayout };
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1122,7 +1181,6 @@ namespace vulkan {
 		depthStencilCreateInfo.depthBoundsTestEnable = VK_FALSE; // Depth bounds test: Does the depth value exist between 2 bounds (front, back)
 		depthStencilCreateInfo.stencilTestEnable = VK_FALSE;
 
-
 		// Create Graphics Pipeline
 		VkGraphicsPipelineCreateInfo pipelineCreateInfo = {};
 		pipelineCreateInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -1131,7 +1189,7 @@ namespace vulkan {
 		pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo; // All the fixed function pipeline states
 		pipelineCreateInfo.pInputAssemblyState = &inputAssembly;
 		pipelineCreateInfo.pViewportState = &viewportStateCreateInfo;
-		pipelineCreateInfo.pDynamicState = nullptr;
+		pipelineCreateInfo.pDynamicState = &dynamicStateCreateInfo;
 		pipelineCreateInfo.pRasterizationState = &rasterizerStateCreateInfo;
 		pipelineCreateInfo.pMultisampleState = &multisampleCreateInfo;
 		pipelineCreateInfo.pColorBlendState = &colorBlending;
@@ -1148,6 +1206,56 @@ namespace vulkan {
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create graphics pipeline");
 		}
+
+		///////////////////// Offscreen pipeline for shadows
+		// Read in SPIR-V code of shaders
+		vertexShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/offscreen.vert.spv");
+
+		// Build shader Modules to link to graphics pipeline
+		vertShaderModule = createShaderModule(vertexShaderCode);
+
+		// SHADER STAGE CREATION INFORMATION
+		// Vertex stage creation information
+		vertShaderCreateInfo = {};
+		vertShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		vertShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+		vertShaderCreateInfo.module = vertShaderModule;
+		vertShaderCreateInfo.pName = "main";
+
+		// Create array of shader stages (Requires array)
+		shaderStages[0] = vertShaderCreateInfo;
+
+		// Pipeline layout (descriptor sets and push constants)
+		std::array<VkDescriptorSetLayout, 3> offscreenDescriptorLayout = { descriptorSetLayout, samplerSetLayout, shadowSetLayout };
+
+		pipelineLayoutCreateInfo = {};
+		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipelineLayoutCreateInfo.setLayoutCount = offscreenDescriptorLayout.size();
+		pipelineLayoutCreateInfo.pSetLayouts = offscreenDescriptorLayout.data();
+		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
+
+
+		// Create Pipeline Layout
+		result = vkCreatePipelineLayout(mainDevice.logicalDevice, &pipelineLayoutCreateInfo, nullptr, &offscreenPipelineLayout);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create pipeline layout");
+		}
+
+		// Disable stuff for the offscreen pipeline
+		colorBlending.attachmentCount = 0; // No colour blending
+		depthStencilCreateInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL; // Cull front faces
+		rasterizerStateCreateInfo.depthBiasEnable = VK_TRUE;
+		dyanamicStateEnables.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
+		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dyanamicStateEnables.size());
+		dynamicStateCreateInfo.pDynamicStates = dyanamicStateEnables.data();
+		multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
+		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		pipelineCreateInfo.renderPass = shadowRenderPass;
+		pipelineCreateInfo.layout = offscreenPipelineLayout;
+
+		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &offscreenPipeline);
+
 
 		// Destroy shader modules after pipeline (no longer needed after pipeline created)
 		vkDestroyShaderModule(mainDevice.logicalDevice, vertShaderModule, nullptr);
@@ -1214,6 +1322,51 @@ namespace vulkan {
 			if (result != VK_SUCCESS) {
 				throw std::runtime_error("Failed to create a framebuffer");
 			}
+		}
+	}
+
+	void VulkanRenderer::createOffscreenFrameBuffer()
+	{
+		// Create depth image
+		shadowImage = createImage(SHADOWMAP_DIM, SHADOWMAP_DIM, 1, VK_FORMAT_D16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &shadowMemory, VK_SAMPLE_COUNT_1_BIT);
+
+		// Create image view
+		shadowImageView = createImageView(shadowImage, VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+		// Create shadow sampler to sample from depth attachment
+		VkSamplerCreateInfo samplerCreateInfo = {};
+		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerCreateInfo.magFilter = VK_FILTER_LINEAR; // How to render when image is magnified on screen
+		samplerCreateInfo.minFilter = VK_FILTER_LINEAR; // How to render when image is minified on screen
+		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+		samplerCreateInfo.mipLodBias = 0.0f; // Level of detail bias for mip level
+		samplerCreateInfo.minLod = 0.0f;
+		samplerCreateInfo.maxLod = 1.0f;
+		samplerCreateInfo.maxAnisotropy = 1.0f; // Sample level of anisotropy
+		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE; // Border beyond texture, only works for border clamp
+
+		VkResult result = vkCreateSampler(mainDevice.logicalDevice, &samplerCreateInfo, nullptr, &shadowDepthSampler);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create sampler");
+		}
+
+		// Create shadow framebuffer
+		VkFramebufferCreateInfo frameBufferCreateInfo = {};
+		frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+		frameBufferCreateInfo.renderPass = shadowRenderPass; // Renderpass layout the framebuffer will be used with
+		frameBufferCreateInfo.attachmentCount = 1;
+		frameBufferCreateInfo.pAttachments = &shadowImageView; // List of attachments 1-to-1 with renderpass
+		frameBufferCreateInfo.width = SHADOWMAP_DIM; // Framebuffer width
+		frameBufferCreateInfo.height = SHADOWMAP_DIM; // Framebuffer height
+		frameBufferCreateInfo.layers = 1; // Framebuffer layers
+
+		result = vkCreateFramebuffer(mainDevice.logicalDevice, &frameBufferCreateInfo, nullptr, &shadowFrameBuffer);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create shadow framebuffer");
 		}
 	}
 
@@ -1350,7 +1503,26 @@ namespace vulkan {
 
 		result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &textureLayoutCreateInfo, nullptr, &samplerSetLayout);
 		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create a sampler descriptor set layout!");
+			throw std::runtime_error("Failed to create a texture sampler descriptor set layout!");
+		}
+
+		// Sampler2D shadowMap in the fragment shader for scene
+		VkDescriptorSetLayoutBinding shadowMapBinding = {};
+		shadowMapBinding.binding = 0;
+		shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		shadowMapBinding.descriptorCount = 1;
+		shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		shadowMapBinding.pImmutableSamplers = nullptr;
+
+		// Create a descriptor set layout with given bindings for texture
+		VkDescriptorSetLayoutCreateInfo shadowLayoutCreateInfo = {};
+		shadowLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		shadowLayoutCreateInfo.bindingCount = 1;
+		shadowLayoutCreateInfo.pBindings = &shadowMapBinding;
+
+		result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &shadowLayoutCreateInfo, nullptr, &shadowSetLayout);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create a shadow sampler descriptor set layout!");
 		}
 	}
 
@@ -1435,7 +1607,7 @@ namespace vulkan {
 			throw std::runtime_error("Failed to create a Descriptor Pool!");
 		}
 
-		// SAMPLER POOL
+		// TEXTURE SAMPLER POOL
 		VkDescriptorPoolSize samplerPoolSize = {};
 		samplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		samplerPoolSize.descriptorCount = MAX_OBJECTS;
@@ -1449,6 +1621,22 @@ namespace vulkan {
 		result = vkCreateDescriptorPool(mainDevice.logicalDevice, &samplerPoolCreateInfo, nullptr, &samplerDescriptorPool);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create a sampler descriptor pool!");
+		}
+
+		// SHADOW SAMPLER POOL
+		VkDescriptorPoolSize shadowSamplerPoolSize = {};
+		shadowSamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		shadowSamplerPoolSize.descriptorCount = MAX_OBJECTS;
+
+		VkDescriptorPoolCreateInfo shadowSamplerPoolCreateInfo = {};
+		shadowSamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		shadowSamplerPoolCreateInfo.maxSets = MAX_OBJECTS;
+		shadowSamplerPoolCreateInfo.poolSizeCount = 1;
+		shadowSamplerPoolCreateInfo.pPoolSizes = &shadowSamplerPoolSize;
+
+		result = vkCreateDescriptorPool(mainDevice.logicalDevice, &shadowSamplerPoolCreateInfo, nullptr, &shadowSamplerDescriptorPool);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create a shadow sampler descriptor pool!");
 		}
 
 		// Imgui specific descriptor pool
@@ -1549,7 +1737,6 @@ namespace vulkan {
 			lightSetWrite.descriptorCount = 1;
 			lightSetWrite.pBufferInfo = &lightBufferInfo; // Information about buffer data to bind
 
-
 			// CAMERA LIGHT UNIFORM DESCRIPTOR
 			// Buffer info and data offset info
 			VkDescriptorBufferInfo cameraPositionInfo = {};
@@ -1572,6 +1759,39 @@ namespace vulkan {
 			// Update the descriptor sets with new buffer binding info
 			vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(setWrites.size()), setWrites.data(), 0, nullptr);
 		}
+
+		///////////////////// Shadow Sampler
+		
+		// Descriptor Set Allocation Info
+		setAllocInfo = {};
+		setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		setAllocInfo.descriptorPool = shadowSamplerDescriptorPool;
+		setAllocInfo.descriptorSetCount = 1;
+		setAllocInfo.pSetLayouts = &shadowSetLayout;
+
+		result = vkAllocateDescriptorSets(mainDevice.logicalDevice, &setAllocInfo, &shadowSamplerDescriptorSet);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to allocate shadow sampler descriptor set");
+		}
+
+		// Sampler image info
+		VkDescriptorImageInfo shadowMapDescriptor = {};
+		shadowMapDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		shadowMapDescriptor.imageView = shadowImageView;
+		shadowMapDescriptor.sampler = shadowDepthSampler;
+
+		// Descriptor Write Info
+		VkWriteDescriptorSet descriptorWrite = {};
+		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite.dstSet = shadowSamplerDescriptorSet;
+		descriptorWrite.dstBinding = 0;
+		descriptorWrite.dstArrayElement = 0;
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		descriptorWrite.descriptorCount = 1;
+		descriptorWrite.pImageInfo = &shadowMapDescriptor;
+
+		// Update new descriptor set
+		vkUpdateDescriptorSets(mainDevice.logicalDevice, 1, &descriptorWrite, 0, nullptr);
 	}
 
 	void VulkanRenderer::createTextureSampler()
@@ -1683,37 +1903,8 @@ namespace vulkan {
 		vkUnmapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex]);
 	}
 
-	void VulkanRenderer::recordCommands(uint32_t currentImage)
+	void VulkanRenderer::drawScene(uint32_t currentImage, bool isOffscreen)
 	{
-		// Information about how to begin each command buffer
-		VkCommandBufferBeginInfo bufferBeginInfo = {};
-		bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-
-		// Information about how to begin a render pass (only needed for graphical applications)
-		VkRenderPassBeginInfo renderPassBeginInfo = {};
-		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = renderPass;
-		renderPassBeginInfo.renderArea.offset = { 0, 0 };
-		renderPassBeginInfo.renderArea.extent = swapChainExtent;
-		std::array<VkClearValue, 2> clearValues = {};
-		clearValues[0].color = { 0.6f, 0.65f, 0.4f, 1.0f }; // Color attachment clear value
-		clearValues[1].depthStencil.depth = 1.0f;
-
-		renderPassBeginInfo.pClearValues = clearValues.data(); // List of clear values
-		renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-
-		renderPassBeginInfo.framebuffer = swapChainFramebuffers[currentImage];
-
-		VkResult result = vkBeginCommandBuffer(commandBuffers[currentImage], &bufferBeginInfo);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to start recording to a command buffer!");
-		}
-
-		vkCmdBeginRenderPass(commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-		// Bind Pipeline to be used in renderpass
-		vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-
 		for (size_t j = 0; j < modelList.size(); j++) {
 			MeshModel thisModel = modelList[j];
 
@@ -1728,14 +1919,24 @@ namespace vulkan {
 
 				// Dynamic offset amount
 				uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+				
+				if (isOffscreen)
+				{
+					std::array<VkDescriptorSet, 1> descriptorSetGroup = { descriptorSets[currentImage] };
+					// Bind descriptor sets
+					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
+						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
 
-				std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[thisModel.getMesh(k)->getTexId()] };
+					vkCmdPushConstants(commandBuffers[currentImage], offscreenPipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+				}
+				else {
+					std::array<VkDescriptorSet, 3> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[thisModel.getMesh(k)->getTexId()], shadowSamplerDescriptorSet };
+					// Bind descriptor sets
+					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
 
-				// Bind descriptor sets
-				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-
-				vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+					vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+				}
 
 				// Execute our pipeline
 				vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
@@ -1752,56 +1953,184 @@ namespace vulkan {
 
 			// Dynamic offset amount
 			uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
-
-			if (thisModel.hasTexture)
+			
+			if (isOffscreen)
 			{
-				std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()] };
-				// Bind descriptor sets
-				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-			}
-			else {
 				std::array<VkDescriptorSet, 1> descriptorSetGroup = { descriptorSets[currentImage] };
 				// Bind descriptor sets
-				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
 					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-			}
 
-			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
+				vkCmdPushConstants(commandBuffers[currentImage], offscreenPipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
+			} else {
+				if (thisModel.hasTexture)
+				{
+					std::array<VkDescriptorSet, 3> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()], shadowSamplerDescriptorSet };
+					// Bind descriptor sets
+					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+				}
+				else {
+					std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], shadowSamplerDescriptorSet };
+					// Bind descriptor sets
+					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+				}
+
+				vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
+			}
 
 			// Execute our pipeline
 			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
 		}
+	}
 
-		vkCmdEndRenderPass(commandBuffers[currentImage]);
+	void VulkanRenderer::recordCommands(uint32_t currentImage)
+	{
+		// Information about how to begin each command buffer
+		VkCommandBufferBeginInfo bufferBeginInfo = {};
+		bufferBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+		// First renderpass offscreen for shadow mapping
+		VkResult result = vkBeginCommandBuffer(commandBuffers[currentImage], &bufferBeginInfo);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to start recording to a command buffer!");
+		}
+
+		// Define renderpass struct
+		// For offscreen
+		std::array<VkClearValue, 1> shadowClearValues = {};
+		shadowClearValues[0].depthStencil = { 1.0f, 0 };
+
+		VkRenderPassBeginInfo renderPassBeginInfo = {};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.renderPass = shadowRenderPass;
+		renderPassBeginInfo.framebuffer = shadowFrameBuffer;
+		renderPassBeginInfo.renderArea.extent.width = SHADOWMAP_DIM;
+		renderPassBeginInfo.renderArea.extent.height = SHADOWMAP_DIM;
+		renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(shadowClearValues.size());
+		renderPassBeginInfo.pClearValues = shadowClearValues.data(); // List of clear values
+
+			vkCmdBeginRenderPass(commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+				VkViewport viewport = {};
+				viewport.height = SHADOWMAP_DIM;
+				viewport.width = SHADOWMAP_DIM;
+				viewport.minDepth = 0.0f;
+				viewport.maxDepth = 1.0f;
+				vkCmdSetViewport(commandBuffers[currentImage], 0, 1, &viewport);
+
+				VkRect2D scissor = {};
+				scissor.extent.width = SHADOWMAP_DIM;
+				scissor.extent.height = SHADOWMAP_DIM;
+				scissor.offset.x = 0;
+				scissor.offset.y = 0;
+				vkCmdSetScissor(commandBuffers[currentImage], 0, 1, &scissor);
+
+				vkCmdSetDepthBias(
+					commandBuffers[currentImage],
+					1.25, // Depth bias constant
+					0.0f,
+					1.75 // Depth bias slope
+				);
+
+
+				for (size_t j = 0; j < modelList.size(); j++) {
+					MeshModel thisModel = modelList[j];
+
+					for (size_t k = 0; k < thisModel.getMeshCount(); k++) {
+						//Model model = thisModel.getMesh(k)->getModel();
+						Model model = thisModel.getModel();
+						// Bind our vertex buffer
+						VkBuffer vertexBuffers[] = { thisModel.getMesh(k)->getVertexBuffer() }; // Buffers to bind
+						VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+						vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
+						vkCmdBindIndexBuffer(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
+
+						// Dynamic offset amount
+						uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+
+							vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipeline);
+							// Bind descriptor sets
+							vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
+								0, 1, &descriptorSets[currentImage], 1, &dynamicOffset);
+							vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+
+
+						// Execute our pipeline
+						vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
+					}
+				}
+
+			vkCmdEndRenderPass(commandBuffers[currentImage]);
 
 		result = vkEndCommandBuffer(commandBuffers[currentImage]);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to stop recording to a command buffer!");
 		}
 
+		////////////////////////////////////////
+
+		// Actual 3D Draw
+		// Information about how to begin a render pass (only needed for graphical applications)
+		renderPassBeginInfo = {};
+		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+		renderPassBeginInfo.renderPass = renderPass;
+		renderPassBeginInfo.framebuffer = swapChainFramebuffers[currentImage];
+		renderPassBeginInfo.renderArea.offset = { 0, 0 };
+		renderPassBeginInfo.renderArea.extent = swapChainExtent;
+		std::array<VkClearValue, 2> clearValues = {};
+		clearValues[0].color = { 0.1f, 0.1f, 0.1f, 1.0f }; // Color attachment clear value
+		clearValues[1].depthStencil.depth = 1.0f;
+		renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+		renderPassBeginInfo.pClearValues = clearValues.data(); // List of clear values
+
+		result = vkBeginCommandBuffer(commandBuffers[currentImage], &bufferBeginInfo);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to start recording to a command buffer!");
+		}
+
+			vkCmdBeginRenderPass(commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+				// Bind Pipeline to be used in renderpass
+				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+
+				// Draw scene
+				// Calls vkCmdDrawIndexed etc and loops through meshes/models
+				//drawScene(currentImage, 0);
+
+			vkCmdEndRenderPass(commandBuffers[currentImage]);
+
+		result = vkEndCommandBuffer(commandBuffers[currentImage]);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to stop recording to a command buffer!");
+		}
+
+		/////////////////////////////////////////
+
+		// Imgui overlay renderpass
 		result = vkBeginCommandBuffer(imguiCommandBuffers[currentImage], &bufferBeginInfo);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to start recording to a command buffer!");
 		}
 
-		VkRenderPassBeginInfo info = {};
-		info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		info.renderPass = imguiRenderPass;
-		info.framebuffer = imguiFrameBuffers[currentImage];
-		info.renderArea.extent.width = swapChainExtent.width;
-		info.renderArea.extent.height = swapChainExtent.height;
-		info.clearValueCount = 1;
-		std::array<VkClearValue, 1> clearValuesImgui = {};
-		clearValuesImgui[0].color = { 0.6f, 0.65f, 0.4f, 1.0f }; // Color attachment clear value
-		info.pClearValues = clearValuesImgui.data(); // List of clear values
-		info.clearValueCount = static_cast<uint32_t>(clearValuesImgui.size());
+			VkRenderPassBeginInfo info = {};
+			info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			info.renderPass = imguiRenderPass;
+			info.framebuffer = imguiFrameBuffers[currentImage];
+			info.renderArea.extent.width = swapChainExtent.width;
+			info.renderArea.extent.height = swapChainExtent.height;
+			info.clearValueCount = 1;
+			std::array<VkClearValue, 1> clearValuesImgui = {};
+			clearValuesImgui[0].color = { 0.6f, 0.65f, 0.4f, 1.0f }; // Color attachment clear value
+			info.pClearValues = clearValuesImgui.data(); // List of clear values
+			info.clearValueCount = static_cast<uint32_t>(clearValuesImgui.size());
 
-		vkCmdBeginRenderPass(imguiCommandBuffers[currentImage], &info, VK_SUBPASS_CONTENTS_INLINE);
+			vkCmdBeginRenderPass(imguiCommandBuffers[currentImage], &info, VK_SUBPASS_CONTENTS_INLINE);
 
-		ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), imguiCommandBuffers[currentImage]);
+				ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), imguiCommandBuffers[currentImage]);
 
-		vkCmdEndRenderPass(imguiCommandBuffers[currentImage]);
+			vkCmdEndRenderPass(imguiCommandBuffers[currentImage]);
 
 		result = vkEndCommandBuffer(imguiCommandBuffers[currentImage]);
 		if (result != VK_SUCCESS) {

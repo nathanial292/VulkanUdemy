@@ -4,8 +4,10 @@ layout(location = 0) in vec3 fragCol;
 layout(location = 1) in vec2 fragTex;
 layout(location = 2) in vec3 Normal;
 layout(location = 3) in vec3 FragPos;
+layout(location = 4) in vec4 shadowCoord;
 
 layout(set = 1, binding = 0) uniform sampler2D textureSampler;
+layout(set = 2, binding = 0) uniform sampler2D shadowMap;
 
 layout(location = 0) out vec4 outColour; 	// Final output colour (must also have location
 
@@ -15,12 +17,6 @@ layout(set = 0, binding = 1) uniform UboModel {
 	mat4 inverseModel;
 	bool hasTexture;
 } uboModel;
-
-layout(push_constant) uniform PushModel {
-	mat4 model;
-	mat4 inverseModel;
-	bool hasTexture;
-} pushModel;
 
 // Uniform buffer for light
 layout(set = 0, binding = 2) uniform DirectionalLight {
@@ -37,6 +33,26 @@ layout(set = 0, binding = 2) uniform DirectionalLight {
 layout(set = 0, binding = 3) uniform CameraPosition {
 	vec3 cameraPos;	
 } cameraPosition;
+
+layout(push_constant) uniform PushModel {
+	mat4 model;
+	mat4 inverseModel;
+	bool hasTexture;
+} pushModel;
+
+float textureProj(vec4 shadowCoord, vec2 off)
+{
+	float shadow = 1.0;
+	if ( shadowCoord.z > -1.0 && shadowCoord.z < 1.0 ) 
+	{
+		float dist = texture( shadowMap, shadowCoord.st + off ).r;
+		if ( shadowCoord.w > 0.0 && dist < shadowCoord.z ) 
+		{
+			shadow = 0.1;
+		}
+	}
+	return shadow;
+}
 
 vec4 CalcLightByDirection()
 {
@@ -76,7 +92,9 @@ vec4 CalcDirectionalLight()
 
 void main() 
 {
-	vec4 finalColour = CalcDirectionalLight();		
+	float shadow = textureProj(shadowCoord / shadowCoord.w, vec2(0.0));
+
+	vec4 finalColour = CalcDirectionalLight() * shadow;		
 	if (pushModel.hasTexture) {
 		outColour = texture(textureSampler, fragTex) * finalColour;
 		

@@ -19,6 +19,8 @@ namespace vulkan {
 
         UniformLight getLight();
 
+        glm::vec3 getPosition();
+
         void updateLight(glm::vec3* position, glm::vec3* colour, float *ambientIntensity, float *diffuseIntensity);
 
         ~DirectionalLight();

@@ -31,6 +31,14 @@
 #define IMGUI_VULKAN_DEBUG_REPORT
 #endif
 
+// Shadowmap properties
+#if defined(__ANDROID__)
+#define SHADOWMAP_DIM 1024
+#else
+#define SHADOWMAP_DIM 2048
+#endif
+#define DEFAULT_SHADOWMAP_FILTER VK_FILTER_LINEAR
+
 namespace vulkan {
 	class VulkanRenderer
 	{
@@ -58,11 +66,13 @@ namespace vulkan {
 		void createSwapChain();
 		void createDepthBufferImage();
 		void createRenderPass();
+		void createOffscreenRenderPass();
 		void createImguiRenderPass();
 		void createDescriptorSetLayout();
 		void createPushConstantRange();
 		void createGraphicsPipeline();
 		void createFrameBuffers();
+		void createOffscreenFrameBuffer();
 		void createCommandPool();
 		void createCommandBuffers();
 		void createSynchronisation();
@@ -78,6 +88,7 @@ namespace vulkan {
 
 		// Record functions
 		void recordCommands(uint32_t currentImage);
+		void drawScene(uint32_t currentImage, bool isOffscreen);
 		void updateUniformBuffers(uint32_t imageIndex);
 
 		// Get Functions
@@ -222,6 +233,16 @@ namespace vulkan {
 		VkDeviceMemory colourImageMemory;
 		VkImageView colourImageView;
 
+		// Shadow class members
+		// TODO: Really should use a separate class for this but fuck it for now
+		VkImage shadowImage;
+		VkDeviceMemory shadowMemory;
+		VkImageView shadowImageView;
+		// Offscreen framebuffer stuff (for shadows)
+		VkFramebuffer shadowFrameBuffer;
+		VkRenderPass shadowRenderPass;
+
+		VkSampler shadowDepthSampler;
 		VkSampler textureSampler;
 
 		// Assets
@@ -238,10 +259,12 @@ namespace vulkan {
 
 		// Pipeline
 		VkPipelineLayout pipelineLayout;
+		VkPipelineLayout offscreenPipelineLayout;
 		VkRenderPass renderPass;
 		VkRenderPass imguiRenderPass;
 
 		VkPipeline graphicsPipeline;
+		VkPipeline offscreenPipeline;
 
 		// Pools
 		VkCommandPool graphicsCommandPool;
@@ -255,19 +278,23 @@ namespace vulkan {
 		struct UboViewProjection {
 			glm::mat4 projection;
 			glm::mat4 view;
+			glm::mat4 lightTransform;
 		} uboViewProjection;
 
 		// Descriptors
 		VkDescriptorSetLayout descriptorSetLayout;
 		VkDescriptorSetLayout samplerSetLayout;
+		VkDescriptorSetLayout shadowSetLayout;
 
 		VkPushConstantRange pushConstantRange;
 
 		VkDescriptorPool descriptorPool;
 		VkDescriptorPool samplerDescriptorPool;
 		VkDescriptorPool imguiDescriptorPool;
+		VkDescriptorPool shadowSamplerDescriptorPool;
 		std::vector<VkDescriptorSet> descriptorSets;
 		std::vector<VkDescriptorSet> samplerDescriptorSets;
+		VkDescriptorSet shadowSamplerDescriptorSet;
 
 		// Uniform Buffers (Static for every model)
 		std::vector<VkBuffer> vpUniformBuffer;

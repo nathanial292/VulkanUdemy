@@ -21,6 +21,11 @@ namespace vulkan {
 		return light;
 	}
 
+	glm::vec3 DirectionalLight::getPosition()
+	{
+		return direction;
+	}
+
 	void DirectionalLight::updateLight(glm::vec3* position, glm::vec3* colour, float* ambientIntensity, float* diffuseIntensity)
 	{
 		this->direction = *position;
