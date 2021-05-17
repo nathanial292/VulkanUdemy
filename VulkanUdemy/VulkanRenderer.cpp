@@ -10,7 +10,7 @@ namespace vulkan {
 		cleanup();
 	}
 
-	int VulkanRenderer::init(Window* newWindow, Camera* newCamera)
+	int VulkanRenderer::init(Window* newWindow, Camera* newCamera, int sampleCount)
 	{
 		window = newWindow;
 		camera = newCamera;
@@ -18,7 +18,7 @@ namespace vulkan {
 			createInstance();
 			setupDebugMessenger();
 			createSurface();
-			getPhysicalDevice();
+			getPhysicalDevice(sampleCount);
 			createLogicalDevice();
 			createSwapChain();
 			createDepthBufferImage();
@@ -57,7 +57,7 @@ namespace vulkan {
 			glfwGetFramebufferSize(window->getWindow(), &width, &height);
 			glfwWaitEvents();
 		}
-		ImGui_ImplVulkan_SetMinImageCount(2);
+		ImGui_ImplVulkan_SetMinImageCount(3);
 
 		cleanupSwapChain();
 		createSwapChain();
@@ -198,9 +198,8 @@ namespace vulkan {
 		VkResult result = vkAcquireNextImageKHR(mainDevice.logicalDevice, swapchain, std::numeric_limits<uint64_t>::max(), imageAvailable[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
 		if (result == VK_ERROR_OUT_OF_DATE_KHR || frameBufferResized) {
-			recreateSwapChain();
 			frameBufferResized = false;
-
+			recreateSwapChain();
 			return;
 		}
 		else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
@@ -417,7 +416,8 @@ namespace vulkan {
 		}
 	}
 
-	void VulkanRenderer::getPhysicalDevice()
+	// Jank fix for multisample on startup
+	void VulkanRenderer::getPhysicalDevice(int sampleCount)
 	{
 		// Enumerate the physical devices the vkInstance can access
 		// Get the count of devices
@@ -441,7 +441,7 @@ namespace vulkan {
 			{
 				mainDevice.physicalDevice = device;
 				//msaaSamples = getMaxUseableSampleCount();
-				msaaSamples = VK_SAMPLE_COUNT_8_BIT;
+				msaaSamples = translateSampleIntToEnum(sampleCount);
 				break;
 			}
 		}
@@ -1674,12 +1674,12 @@ namespace vulkan {
 		vkUnmapMemory(mainDevice.logicalDevice, directionalLightUniformBufferMemory[imageIndex]);
 		
 
-		glm::vec3 cameraPosition = camera->getCameraPosition();
+		glm::vec3* cameraPosition = camera->getCameraPosition();
 		//std::cout << "CAMERA POSITION" << "\n";
 		//std::cout << cameraPosition.x << " " << cameraPosition.y << " " << cameraPosition.z << "\n";
 
 		vkMapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex], 0, sizeof(glm::vec3), 0, &data);
-		memcpy(data, &cameraPosition, sizeof(glm::vec3));
+		memcpy(data, cameraPosition, sizeof(glm::vec3));
 		vkUnmapMemory(mainDevice.logicalDevice, cameraPositionUniformBufferMemory[imageIndex]);
 	}
 

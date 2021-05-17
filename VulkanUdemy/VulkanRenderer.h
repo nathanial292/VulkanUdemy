@@ -37,7 +37,7 @@ namespace vulkan {
 	public:
 		VulkanRenderer();
 
-		int init(Window* window, Camera* camera);
+		int init(Window* window, Camera* camera, int sampleCount);
 
 		void updateModel(int modelId, glm::mat4 *newModel);
 		void updateModelMesh(int modelId, glm::mat4 *newModel);
@@ -81,7 +81,7 @@ namespace vulkan {
 		void updateUniformBuffers(uint32_t imageIndex);
 
 		// Get Functions
-		void getPhysicalDevice();
+		void getPhysicalDevice(int sampleCount);
 
 		// Set functions
 		void setMeshList(std::vector<Mesh>* theMeshlist) {
@@ -102,8 +102,20 @@ namespace vulkan {
 				if (level == 4) msaaSamples = VK_SAMPLE_COUNT_4_BIT;
 				if (level == 8) msaaSamples = VK_SAMPLE_COUNT_8_BIT;
 
-				recreateSwapChain();
+				//recreateSwapChain();
 			}
+		}
+		VkSampleCountFlagBits translateSampleIntToEnum(int level)
+		{
+			VkSampleCountFlagBits temp;
+			if (level % 2 == 0 || level == 1) {
+				std::cout << level;
+				if (level == 1) temp = VK_SAMPLE_COUNT_1_BIT;
+				if (level == 2) temp = VK_SAMPLE_COUNT_2_BIT;
+				if (level == 4) temp = VK_SAMPLE_COUNT_4_BIT;
+				if (level == 8) temp = VK_SAMPLE_COUNT_8_BIT;
+			}
+			return temp;
 		}
 		void setTextureStateModel(int modelIndex, bool state)
 		{
