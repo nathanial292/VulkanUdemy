@@ -35,7 +35,7 @@
 #if defined(__ANDROID__)
 #define SHADOWMAP_DIM 1024
 #else
-#define SHADOWMAP_DIM 2048
+#define SHADOWMAP_DIM 8192
 #endif
 #define DEFAULT_SHADOWMAP_FILTER VK_FILTER_LINEAR
 
@@ -239,7 +239,6 @@ namespace vulkan {
 		VkFramebuffer shadowFrameBuffer;
 		VkRenderPass shadowRenderPass;
 		VkSampler shadowDepthSampler;
-
 		VkSampler textureSampler;
 
 		// Assets
@@ -281,6 +280,7 @@ namespace vulkan {
 		// Descriptors
 		VkDescriptorSetLayout descriptorSetLayout;
 		VkDescriptorSetLayout samplerSetLayout;
+		VkDescriptorSetLayout shadowSamplerSetLayout;
 
 		VkPushConstantRange pushConstantRange;
 
@@ -289,6 +289,7 @@ namespace vulkan {
 		VkDescriptorPool imguiDescriptorPool;
 		std::vector<VkDescriptorSet> descriptorSets;
 		std::vector<VkDescriptorSet> samplerDescriptorSets;
+		VkDescriptorSet shadowSamplerDescriptorSet;
 
 		// Uniform Buffers (Static for every model)
 		std::vector<VkBuffer> vpUniformBuffer;

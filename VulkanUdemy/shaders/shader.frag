@@ -5,9 +5,9 @@ layout(location = 1) in vec2 fragTex;
 layout(location = 2) in vec3 Normal;
 layout(location = 3) in vec3 FragPos;
 layout(location = 4) in vec4 shadowCoord;
-
+ 
 layout(set = 1, binding = 0) uniform sampler2D textureSampler;
-layout(set = 1, binding = 1) uniform sampler2D shadowMap;
+layout(set = 2, binding = 0) uniform sampler2D shadowMap;
 
 layout(location = 0) out vec4 outColour; 	// Final output colour (must also have location
 
@@ -39,6 +39,39 @@ layout(push_constant) uniform PushModel {
 	mat4 inverseModel;
 	bool hasTexture;
 } pushModel;
+
+float CalcDirectionalShadowFactor()
+{
+	vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
+	projCoords = (projCoords * 0.5) + 0.5; // Scale between 0 and 1 from -1 and 1
+	
+	float current = projCoords.z;
+	
+	vec3 normal = normalize(Normal);
+	vec3 lightDir = normalize(vec3(directionalLight.directionX, directionalLight.directionY, directionalLight.directionZ) - FragPos);
+	
+	float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.0005);
+	
+	float shadow = 0.0;
+	
+	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+	for (int i = -1; i <= 1; i++)
+	{
+		for (int k = -1; k <= 1; k++)
+		{
+			float pcfDepth = texture(shadowMap, projCoords.xy + vec2(i,k) * texelSize).r;
+			shadow += current - bias > pcfDepth ? 1.0 : 0.0;;
+		}
+	}
+	shadow /= 9.0;
+	
+	if(projCoords.z > 1.0)
+	{
+		shadow = 0.0;
+	}
+	
+	return shadow;
+}
 
 float textureProj(vec4 shadowCoord, vec2 off)
 {
@@ -87,29 +120,16 @@ vec4 CalcLightByDirection()
 vec4 CalcDirectionalLight()
 {
 	//float shadowFactor = CalcDirectionalShadowFactor();
-	return CalcLightByDirection();
+	//float shadow = textureProj(shadowCoord / shadowCoord.w, vec2(0.0));
+	float shadow = CalcDirectionalShadowFactor();
+	return CalcLightByDirection() * shadow;
 }
 
 void main() 
 {
-	float shadow = textureProj(shadowCoord / shadowCoord.w, vec2(0.0));
-
-	vec4 finalColour = CalcDirectionalLight() * shadow;		
+	vec4 finalColour = CalcDirectionalLight();		
 	if (pushModel.hasTexture) {
 		outColour = texture(textureSampler, fragTex) * finalColour;
-		
-		//vec3 normal = normalize(Normal);
-		//vec3 lightDir = normalize(directionalLight.direction - FragPos);
-		
-		//float diffuseFactor = max(dot(normal, lightDir), 0.0f);
-		
-		//outColour = vec4(diffuseFactor, 1.0, 1.0, 1.0f);
-		//float bug=0.0;
-
-		//if(directionalLight.direction.y <= 0) bug=1.0;
-
-		//outColour.x+=bug;
-		//outColour = vec4(0,0,directionalLight.ambientIntensity,1);
 	}
 	else {
 		//outColour = vec4(0,0,1,1);

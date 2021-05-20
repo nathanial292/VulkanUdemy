@@ -14,8 +14,14 @@ layout(push_constant) uniform PushModel {
 	mat4 inverseModel;
 	bool hasTexture;
 } pushModel;
+
+out gl_PerVertex 
+{
+    vec4 gl_Position;   
+};
+
  
 void main()
 {
-	gl_Position =  ubo.lightSpace * pushModel.model * vec4(pos, 1.0);
+	gl_Position =  ubo.lightSpace * vec4(pos, 1.0);
 }
