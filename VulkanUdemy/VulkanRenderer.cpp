@@ -20,6 +20,7 @@ namespace vulkan {
 			createSurface();
 			getPhysicalDevice(sampleCount);
 			createLogicalDevice();
+			createCommandPool();
 			createSwapChain();
 			createDepthBufferImage();
 			createColourImage();
@@ -31,7 +32,6 @@ namespace vulkan {
 			createGraphicsPipeline();
 			createFrameBuffers();
 			createOffscreenFrameBuffer(); // Shadow framebuffer
-			createCommandPool();
 			allocateDynamicBufferTransferSpace();
 			createUniformBuffers();
 			createCommandBuffers();
@@ -963,7 +963,7 @@ namespace vulkan {
 	{
 		VkAttachmentDescription attachmentDescription = {};
 		attachmentDescription.format = VK_FORMAT_D16_UNORM;
-		attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
+		attachmentDescription.samples = msaaSamples;
 		attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;							// Clear depth at beginning of the render pass
 		attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;						// We will read from depth, so it's important to store the depth attachment results
 		attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -1122,6 +1122,7 @@ namespace vulkan {
 		dynamicStateCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dyanamicStateEnables.size());
 		dynamicStateCreateInfo.pDynamicStates = dyanamicStateEnables.data();
+		dynamicStateCreateInfo.pNext = 0;
 
 		// Rasterizer
 		VkPipelineRasterizationStateCreateInfo rasterizerStateCreateInfo = {};
@@ -1157,11 +1158,11 @@ namespace vulkan {
 		colorBlending.blendConstants[3] = 0.0f;
 
 		// Pipeline layout (descriptor sets and push constants)
-		std::array<VkDescriptorSetLayout, 3> descriptorSetLayouts = { descriptorSetLayout, samplerSetLayout, shadowSetLayout };
+		std::array<VkDescriptorSetLayout, 2> descriptorSetLayouts = { descriptorSetLayout, samplerSetLayout };
 
 		VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {};
 		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutCreateInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
+		pipelineLayoutCreateInfo.setLayoutCount = 2;
 		pipelineLayoutCreateInfo.pSetLayouts = descriptorSetLayouts.data();
 		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
 		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
@@ -1222,22 +1223,17 @@ namespace vulkan {
 		vertShaderCreateInfo.module = vertShaderModule;
 		vertShaderCreateInfo.pName = "main";
 
-		// Create array of shader stages (Requires array)
-		shaderStages[0] = vertShaderCreateInfo;
+		VkPipelineShaderStageCreateInfo offscreenShaderStages[] = { vertShaderCreateInfo };
 
-		// Pipeline layout (descriptor sets and push constants)
-		std::array<VkDescriptorSetLayout, 3> offscreenDescriptorLayout = { descriptorSetLayout, samplerSetLayout, shadowSetLayout };
-
-		pipelineLayoutCreateInfo = {};
-		pipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutCreateInfo.setLayoutCount = offscreenDescriptorLayout.size();
-		pipelineLayoutCreateInfo.pSetLayouts = offscreenDescriptorLayout.data();
-		pipelineLayoutCreateInfo.pushConstantRangeCount = 1;
-		pipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
-
+		VkPipelineLayoutCreateInfo offscreenPipelineLayoutCreateInfo = {};
+		offscreenPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		offscreenPipelineLayoutCreateInfo.setLayoutCount = 1;
+		offscreenPipelineLayoutCreateInfo.pSetLayouts = &descriptorSetLayout;
+		offscreenPipelineLayoutCreateInfo.pushConstantRangeCount = 1;
+		offscreenPipelineLayoutCreateInfo.pPushConstantRanges = &pushConstantRange;
 
 		// Create Pipeline Layout
-		result = vkCreatePipelineLayout(mainDevice.logicalDevice, &pipelineLayoutCreateInfo, nullptr, &offscreenPipelineLayout);
+		result = vkCreatePipelineLayout(mainDevice.logicalDevice, &offscreenPipelineLayoutCreateInfo, nullptr, &offscreenPipelineLayout);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create pipeline layout");
 		}
@@ -1250,12 +1246,13 @@ namespace vulkan {
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dyanamicStateEnables.size());
 		dynamicStateCreateInfo.pDynamicStates = dyanamicStateEnables.data();
 		multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
-		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+		multisampleCreateInfo.rasterizationSamples = msaaSamples;
 		pipelineCreateInfo.renderPass = shadowRenderPass;
 		pipelineCreateInfo.layout = offscreenPipelineLayout;
+		pipelineCreateInfo.pStages = offscreenShaderStages; // List of shader stages
+		pipelineCreateInfo.stageCount = 1; // Number of shader stages (vertex, fragment)
 
 		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &offscreenPipeline);
-
 
 		// Destroy shader modules after pipeline (no longer needed after pipeline created)
 		vkDestroyShaderModule(mainDevice.logicalDevice, vertShaderModule, nullptr);
@@ -1264,17 +1261,59 @@ namespace vulkan {
 
 	void VulkanRenderer::createDepthBufferImage()
 	{
+		
 		// Get supported format for depth buffer 
 		depthBufferFormat = chooseSupportedFormat(
-			{ VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
+			{ VK_FORMAT_D16_UNORM, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
 			VK_IMAGE_TILING_OPTIMAL,
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 		// Create the depth buffer image
-		depthBufferImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthBufferImageMemory, msaaSamples);
+		depthBufferImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthBufferImageMemory, msaaSamples);
+
+		transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+		generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
 
 		// Create depth buffer image view
 		depthBufferImageView = createImageView(depthBufferImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
+		/*
+		// For shadow mapping we only need a depth attachment
+		VkImageCreateInfo image = {};
+		image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		image.imageType = VK_IMAGE_TYPE_2D;
+		image.extent.width = SHADOWMAP_DIM;
+		image.extent.height = SHADOWMAP_DIM;
+		image.extent.depth = 1;
+		image.mipLevels = 1;
+		image.arrayLayers = 1;
+		image.samples = VK_SAMPLE_COUNT_1_BIT;
+		image.tiling = VK_IMAGE_TILING_OPTIMAL;
+		image.format = VK_FORMAT_D16_UNORM;																// Depth stencil attachment
+		image.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;		// We will sample directly from the depth attachment for the shadow mapping
+		vkCreateImage(mainDevice.logicalDevice, &image, nullptr, &depthBufferImage);
+
+		VkMemoryAllocateInfo memoryAllocInfo = {};
+		memoryAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		VkMemoryRequirements memReqs;
+		vkGetImageMemoryRequirements(mainDevice.logicalDevice, depthBufferImage, &memReqs);
+		memoryAllocInfo.allocationSize = memReqs.size;
+		memoryAllocInfo.memoryTypeIndex = findMemoryTypeIndex(mainDevice.physicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+		vkAllocateMemory(mainDevice.logicalDevice, &memoryAllocInfo, nullptr, &depthBufferImageMemory);
+		vkBindImageMemory(mainDevice.logicalDevice, depthBufferImage, depthBufferImageMemory, 0);
+
+		VkImageViewCreateInfo depthStencilView = {};
+		depthStencilView.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		depthStencilView.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		depthStencilView.format = VK_FORMAT_D16_UNORM;
+		depthStencilView.subresourceRange = {};
+		depthStencilView.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		depthStencilView.subresourceRange.baseMipLevel = 0;
+		depthStencilView.subresourceRange.levelCount = 1;
+		depthStencilView.subresourceRange.baseArrayLayer = 0;
+		depthStencilView.subresourceRange.layerCount = 1;
+		depthStencilView.image = depthBufferImage;
+		vkCreateImageView(mainDevice.logicalDevice, &depthStencilView, nullptr, &depthBufferImageView);*/
 	}
 
 	void VulkanRenderer::createFrameBuffers()
@@ -1327,13 +1366,6 @@ namespace vulkan {
 
 	void VulkanRenderer::createOffscreenFrameBuffer()
 	{
-		// Create depth image
-		shadowImage = createImage(SHADOWMAP_DIM, SHADOWMAP_DIM, 1, VK_FORMAT_D16_UNORM, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 
-		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &shadowMemory, VK_SAMPLE_COUNT_1_BIT);
-
-		// Create image view
-		shadowImageView = createImageView(shadowImage, VK_FORMAT_D16_UNORM, VK_IMAGE_ASPECT_DEPTH_BIT);
-
 		// Create shadow sampler to sample from depth attachment
 		VkSamplerCreateInfo samplerCreateInfo = {};
 		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1359,9 +1391,9 @@ namespace vulkan {
 		frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		frameBufferCreateInfo.renderPass = shadowRenderPass; // Renderpass layout the framebuffer will be used with
 		frameBufferCreateInfo.attachmentCount = 1;
-		frameBufferCreateInfo.pAttachments = &shadowImageView; // List of attachments 1-to-1 with renderpass
-		frameBufferCreateInfo.width = SHADOWMAP_DIM; // Framebuffer width
-		frameBufferCreateInfo.height = SHADOWMAP_DIM; // Framebuffer height
+		frameBufferCreateInfo.pAttachments = &depthBufferImageView; // List of attachments 1-to-1 with renderpass
+		frameBufferCreateInfo.width = swapChainExtent.width; // Framebuffer width
+		frameBufferCreateInfo.height = swapChainExtent.height; // Framebuffer height
 		frameBufferCreateInfo.layers = 1; // Framebuffer layers
 
 		result = vkCreateFramebuffer(mainDevice.logicalDevice, &frameBufferCreateInfo, nullptr, &shadowFrameBuffer);
@@ -1495,34 +1527,24 @@ namespace vulkan {
 		textureLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		textureLayoutBinding.pImmutableSamplers = nullptr;
 
+		VkDescriptorSetLayoutBinding shadowLayoutBinding = {};
+		textureLayoutBinding.binding = 1;
+		textureLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		textureLayoutBinding.descriptorCount = 1;
+		textureLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		textureLayoutBinding.pImmutableSamplers = nullptr;
+
+		std::vector<VkDescriptorSetLayoutBinding> samplerLayoutBindings = { textureLayoutBinding, shadowLayoutBinding };
+
 		// Create a descriptor set layout with given bindings for texture
 		VkDescriptorSetLayoutCreateInfo textureLayoutCreateInfo = {};
 		textureLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		textureLayoutCreateInfo.bindingCount = 1;
-		textureLayoutCreateInfo.pBindings = &textureLayoutBinding;
+		textureLayoutCreateInfo.bindingCount = static_cast<uint32_t>(samplerLayoutBindings.size());
+		textureLayoutCreateInfo.pBindings = samplerLayoutBindings.data();
 
 		result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &textureLayoutCreateInfo, nullptr, &samplerSetLayout);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create a texture sampler descriptor set layout!");
-		}
-
-		// Sampler2D shadowMap in the fragment shader for scene
-		VkDescriptorSetLayoutBinding shadowMapBinding = {};
-		shadowMapBinding.binding = 0;
-		shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		shadowMapBinding.descriptorCount = 1;
-		shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		shadowMapBinding.pImmutableSamplers = nullptr;
-
-		// Create a descriptor set layout with given bindings for texture
-		VkDescriptorSetLayoutCreateInfo shadowLayoutCreateInfo = {};
-		shadowLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-		shadowLayoutCreateInfo.bindingCount = 1;
-		shadowLayoutCreateInfo.pBindings = &shadowMapBinding;
-
-		result = vkCreateDescriptorSetLayout(mainDevice.logicalDevice, &shadowLayoutCreateInfo, nullptr, &shadowSetLayout);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create a shadow sampler descriptor set layout!");
 		}
 	}
 
@@ -1613,7 +1635,7 @@ namespace vulkan {
 		samplerPoolSize.descriptorCount = MAX_OBJECTS;
 
 		VkDescriptorPoolCreateInfo samplerPoolCreateInfo = {};
-		samplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+		samplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
 		samplerPoolCreateInfo.maxSets = MAX_OBJECTS;
 		samplerPoolCreateInfo.poolSizeCount = 1;
 		samplerPoolCreateInfo.pPoolSizes = &samplerPoolSize;
@@ -1621,22 +1643,6 @@ namespace vulkan {
 		result = vkCreateDescriptorPool(mainDevice.logicalDevice, &samplerPoolCreateInfo, nullptr, &samplerDescriptorPool);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create a sampler descriptor pool!");
-		}
-
-		// SHADOW SAMPLER POOL
-		VkDescriptorPoolSize shadowSamplerPoolSize = {};
-		shadowSamplerPoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		shadowSamplerPoolSize.descriptorCount = MAX_OBJECTS;
-
-		VkDescriptorPoolCreateInfo shadowSamplerPoolCreateInfo = {};
-		shadowSamplerPoolCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-		shadowSamplerPoolCreateInfo.maxSets = MAX_OBJECTS;
-		shadowSamplerPoolCreateInfo.poolSizeCount = 1;
-		shadowSamplerPoolCreateInfo.pPoolSizes = &shadowSamplerPoolSize;
-
-		result = vkCreateDescriptorPool(mainDevice.logicalDevice, &shadowSamplerPoolCreateInfo, nullptr, &shadowSamplerDescriptorPool);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create a shadow sampler descriptor pool!");
 		}
 
 		// Imgui specific descriptor pool
@@ -1759,39 +1765,6 @@ namespace vulkan {
 			// Update the descriptor sets with new buffer binding info
 			vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(setWrites.size()), setWrites.data(), 0, nullptr);
 		}
-
-		///////////////////// Shadow Sampler
-		
-		// Descriptor Set Allocation Info
-		setAllocInfo = {};
-		setAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		setAllocInfo.descriptorPool = shadowSamplerDescriptorPool;
-		setAllocInfo.descriptorSetCount = 1;
-		setAllocInfo.pSetLayouts = &shadowSetLayout;
-
-		result = vkAllocateDescriptorSets(mainDevice.logicalDevice, &setAllocInfo, &shadowSamplerDescriptorSet);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to allocate shadow sampler descriptor set");
-		}
-
-		// Sampler image info
-		VkDescriptorImageInfo shadowMapDescriptor = {};
-		shadowMapDescriptor.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		shadowMapDescriptor.imageView = shadowImageView;
-		shadowMapDescriptor.sampler = shadowDepthSampler;
-
-		// Descriptor Write Info
-		VkWriteDescriptorSet descriptorWrite = {};
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = shadowSamplerDescriptorSet;
-		descriptorWrite.dstBinding = 0;
-		descriptorWrite.dstArrayElement = 0;
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrite.descriptorCount = 1;
-		descriptorWrite.pImageInfo = &shadowMapDescriptor;
-
-		// Update new descriptor set
-		vkUpdateDescriptorSets(mainDevice.logicalDevice, 1, &descriptorWrite, 0, nullptr);
 	}
 
 	void VulkanRenderer::createTextureSampler()
@@ -1816,7 +1789,6 @@ namespace vulkan {
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create sampler");
 		}
-
 	}
 
 	void VulkanRenderer::createImguiContext()
@@ -1905,6 +1877,7 @@ namespace vulkan {
 
 	void VulkanRenderer::drawScene(uint32_t currentImage, bool isOffscreen)
 	{
+		/*
 		for (size_t j = 0; j < modelList.size(); j++) {
 			MeshModel thisModel = modelList[j];
 
@@ -1919,24 +1892,25 @@ namespace vulkan {
 
 				// Dynamic offset amount
 				uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
-				
+
+				std::vector<VkDescriptorSet> descriptorSetGroup = { };
+
 				if (isOffscreen)
 				{
-					std::array<VkDescriptorSet, 1> descriptorSetGroup = { descriptorSets[currentImage] };
-					// Bind descriptor sets
-					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
-						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-
-					vkCmdPushConstants(commandBuffers[currentImage], offscreenPipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+					descriptorSetGroup.push_back(descriptorSets[currentImage]);
+					descriptorSetGroup.push_back(shadowSamplerDescriptorSet);
 				}
 				else {
-					std::array<VkDescriptorSet, 3> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[thisModel.getMesh(k)->getTexId()], shadowSamplerDescriptorSet };
-					// Bind descriptor sets
-					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-
-					vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+					descriptorSetGroup.push_back(descriptorSets[currentImage]);
+					descriptorSetGroup.push_back(samplerDescriptorSets[meshList[j].getTexId()]);
+					descriptorSetGroup.push_back(shadowSamplerDescriptorSet);
 				}
+
+				// Bind descriptor sets
+				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+
+				vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
 
 				// Execute our pipeline
 				vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
@@ -1953,36 +1927,27 @@ namespace vulkan {
 
 			// Dynamic offset amount
 			uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
-			
+			std::vector<VkDescriptorSet> descriptorSetGroup = { };
+
 			if (isOffscreen)
 			{
-				std::array<VkDescriptorSet, 1> descriptorSetGroup = { descriptorSets[currentImage] };
-				// Bind descriptor sets
-				vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
-					0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-
-				vkCmdPushConstants(commandBuffers[currentImage], offscreenPipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
+				descriptorSetGroup.push_back(descriptorSets[currentImage]);
+				descriptorSetGroup.push_back(shadowSamplerDescriptorSet);
 			} else {
-				if (thisModel.hasTexture)
-				{
-					std::array<VkDescriptorSet, 3> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[meshList[j].getTexId()], shadowSamplerDescriptorSet };
-					// Bind descriptor sets
-					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-				}
-				else {
-					std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], shadowSamplerDescriptorSet };
-					// Bind descriptor sets
-					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
-				}
-
-				vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
+				descriptorSetGroup.push_back(descriptorSets[currentImage]);
+				descriptorSetGroup.push_back(samplerDescriptorSets[meshList[j].getTexId()]);
+				descriptorSetGroup.push_back(shadowSamplerDescriptorSet);
 			}
+
+			// Bind descriptor sets
+			vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+				0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+
+			vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
 
 			// Execute our pipeline
 			vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
-		}
+		}*/
 	}
 
 	void VulkanRenderer::recordCommands(uint32_t currentImage)
@@ -2006,23 +1971,23 @@ namespace vulkan {
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
 		renderPassBeginInfo.renderPass = shadowRenderPass;
 		renderPassBeginInfo.framebuffer = shadowFrameBuffer;
-		renderPassBeginInfo.renderArea.extent.width = SHADOWMAP_DIM;
-		renderPassBeginInfo.renderArea.extent.height = SHADOWMAP_DIM;
+		renderPassBeginInfo.renderArea.extent.width = swapChainExtent.width;
+		renderPassBeginInfo.renderArea.extent.height = swapChainExtent.height;
 		renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(shadowClearValues.size());
 		renderPassBeginInfo.pClearValues = shadowClearValues.data(); // List of clear values
 
 			vkCmdBeginRenderPass(commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
 				VkViewport viewport = {};
-				viewport.height = SHADOWMAP_DIM;
-				viewport.width = SHADOWMAP_DIM;
+				viewport.height = swapChainExtent.height;
+				viewport.width = swapChainExtent.width;
 				viewport.minDepth = 0.0f;
 				viewport.maxDepth = 1.0f;
 				vkCmdSetViewport(commandBuffers[currentImage], 0, 1, &viewport);
 
 				VkRect2D scissor = {};
-				scissor.extent.width = SHADOWMAP_DIM;
-				scissor.extent.height = SHADOWMAP_DIM;
+				scissor.extent.width = swapChainExtent.width;
+				scissor.extent.height = swapChainExtent.height;
 				scissor.offset.x = 0;
 				scissor.offset.y = 0;
 				vkCmdSetScissor(commandBuffers[currentImage], 0, 1, &scissor);
@@ -2034,7 +1999,7 @@ namespace vulkan {
 					1.75 // Depth bias slope
 				);
 
-
+				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipeline);
 				for (size_t j = 0; j < modelList.size(); j++) {
 					MeshModel thisModel = modelList[j];
 
@@ -2050,16 +2015,39 @@ namespace vulkan {
 						// Dynamic offset amount
 						uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
 
-							vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipeline);
-							// Bind descriptor sets
-							vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
-								0, 1, &descriptorSets[currentImage], 1, &dynamicOffset);
-							vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+						std::array<VkDescriptorSet, 1> descriptorSetGroup = { descriptorSets[currentImage] };
 
+						// Bind descriptor sets
+						vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
+							0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+
+						vkCmdPushConstants(commandBuffers[currentImage], offscreenPipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
 
 						// Execute our pipeline
 						vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
 					}
+				}
+				for (size_t j = 0; j < meshList.size(); j++) {
+					Mesh thisMesh = meshList[j];
+					Model thisModel = thisMesh.getModel();
+					// Bind our vertex buffer
+					VkBuffer vertexBuffers[] = { meshList[j].getVertexBuffer() }; // Buffers to bind
+					VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+					vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
+					vkCmdBindIndexBuffer(commandBuffers[currentImage], meshList[j].getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
+
+					// Dynamic offset amount
+					uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+					
+					std::array<VkDescriptorSet, 1> descriptorSetGroup = { descriptorSets[currentImage] };
+					// Bind descriptor sets
+					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipelineLayout,
+						0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+
+					vkCmdPushConstants(commandBuffers[currentImage], offscreenPipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &thisModel);
+
+					// Execute our pipeline
+					vkCmdDrawIndexed(commandBuffers[currentImage], meshList[j].getIndexCount(), 1, 0, 0, 0);
 				}
 
 			vkCmdEndRenderPass(commandBuffers[currentImage]);
@@ -2092,12 +2080,40 @@ namespace vulkan {
 
 			vkCmdBeginRenderPass(commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
+				vkCmdSetViewport(commandBuffers[currentImage], 0, 1, &viewport);
+				vkCmdSetScissor(commandBuffers[currentImage], 0, 1, &scissor);
+
 				// Bind Pipeline to be used in renderpass
 				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
 
-				// Draw scene
-				// Calls vkCmdDrawIndexed etc and loops through meshes/models
-				//drawScene(currentImage, 0);
+				
+				for (size_t j = 0; j < modelList.size(); j++) {
+					MeshModel thisModel = modelList[j];
+
+					for (size_t k = 0; k < thisModel.getMeshCount(); k++) {
+						//Model model = thisModel.getMesh(k)->getModel();
+						Model model = thisModel.getModel();
+						// Bind our vertex buffer
+						VkBuffer vertexBuffers[] = { thisModel.getMesh(k)->getVertexBuffer() }; // Buffers to bind
+						VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+						vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets); // Command to bind vertex buffer before drawing with them
+						vkCmdBindIndexBuffer(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexBuffer(), 0, VK_INDEX_TYPE_UINT32); // Bind mesh index buffer with 0 offset and using uint32 type
+
+						// Dynamic offset amount
+						uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * j;
+
+						std::array<VkDescriptorSet, 2> descriptorSetGroup = { descriptorSets[currentImage], samplerDescriptorSets[thisModel.getMesh(k)->getTexId()] };
+
+						// Bind descriptor sets
+						vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+							0, static_cast<uint32_t>(descriptorSetGroup.size()), descriptorSetGroup.data(), 1, &dynamicOffset);
+
+						vkCmdPushConstants(commandBuffers[currentImage], pipelineLayout, VK_SHADER_STAGE_ALL_GRAPHICS, 0, sizeof(Model), &model);
+
+						// Execute our pipeline
+						vkCmdDrawIndexed(commandBuffers[currentImage], thisModel.getMesh(k)->getIndexCount(), 1, 0, 0, 0);
+					}
+				}
 
 			vkCmdEndRenderPass(commandBuffers[currentImage]);
 
@@ -2321,17 +2337,35 @@ namespace vulkan {
 		imageInfo.sampler = textureSampler; // Sampler to use for set
 
 		// Descriptor Write Info
-		VkWriteDescriptorSet descriptorWrite = {};
-		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		descriptorWrite.dstSet = descriptorSet;
-		descriptorWrite.dstBinding = 0;
-		descriptorWrite.dstArrayElement = 0;
-		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		descriptorWrite.descriptorCount = 1;
-		descriptorWrite.pImageInfo = &imageInfo;
+		VkWriteDescriptorSet textureDescriptorWrite = {};
+		textureDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		textureDescriptorWrite.dstSet = descriptorSet;
+		textureDescriptorWrite.dstBinding = 0;
+		textureDescriptorWrite.dstArrayElement = 0;
+		textureDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		textureDescriptorWrite.descriptorCount = 1;
+		textureDescriptorWrite.pImageInfo = &imageInfo;
+
+		// Shadow image info
+		VkDescriptorImageInfo shadowMapInfo = {};
+		shadowMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		shadowMapInfo.imageView = depthBufferImageView;
+		shadowMapInfo.sampler = shadowDepthSampler;
+
+		// Shadow Write Info
+		VkWriteDescriptorSet shadowDescriptorWrite = {};
+		shadowDescriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		shadowDescriptorWrite.dstSet = descriptorSet;
+		shadowDescriptorWrite.dstBinding = 1;
+		shadowDescriptorWrite.dstArrayElement = 0;
+		shadowDescriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		shadowDescriptorWrite.descriptorCount = 1;
+		shadowDescriptorWrite.pImageInfo = &shadowMapInfo;
+
+		std::vector<VkWriteDescriptorSet> setWrites = { textureDescriptorWrite, shadowDescriptorWrite };
 
 		// Update new descriptor set
-		vkUpdateDescriptorSets(mainDevice.logicalDevice, 1, &descriptorWrite, 0, nullptr);
+		vkUpdateDescriptorSets(mainDevice.logicalDevice, static_cast<uint32_t>(setWrites.size()), setWrites.data(), 0, nullptr);
 
 		// Add descriptor set to list
 		samplerDescriptorSets.push_back(descriptorSet);

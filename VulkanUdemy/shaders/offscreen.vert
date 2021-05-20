@@ -1,6 +1,6 @@
 #version 450
 
-layout (location = 0) in vec3 inPos;
+layout (location = 0) in vec3 pos;
 
 layout (binding = 0) uniform UBO 
 {
@@ -9,13 +9,13 @@ layout (binding = 0) uniform UBO
 	mat4 lightSpace;
 } ubo;
 
-out gl_PerVertex 
-{
-    vec4 gl_Position;   
-};
-
+layout(push_constant) uniform PushModel {
+	mat4 model;
+	mat4 inverseModel;
+	bool hasTexture;
+} pushModel;
  
 void main()
 {
-	gl_Position =  ubo.lightSpace * vec4(inPos, 1.0);
+	gl_Position =  ubo.lightSpace * pushModel.model * vec4(pos, 1.0);
 }

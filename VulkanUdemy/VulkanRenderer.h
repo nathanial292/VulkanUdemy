@@ -235,14 +235,11 @@ namespace vulkan {
 
 		// Shadow class members
 		// TODO: Really should use a separate class for this but fuck it for now
-		VkImage shadowImage;
-		VkDeviceMemory shadowMemory;
-		VkImageView shadowImageView;
 		// Offscreen framebuffer stuff (for shadows)
 		VkFramebuffer shadowFrameBuffer;
 		VkRenderPass shadowRenderPass;
-
 		VkSampler shadowDepthSampler;
+
 		VkSampler textureSampler;
 
 		// Assets
@@ -284,17 +281,14 @@ namespace vulkan {
 		// Descriptors
 		VkDescriptorSetLayout descriptorSetLayout;
 		VkDescriptorSetLayout samplerSetLayout;
-		VkDescriptorSetLayout shadowSetLayout;
 
 		VkPushConstantRange pushConstantRange;
 
 		VkDescriptorPool descriptorPool;
 		VkDescriptorPool samplerDescriptorPool;
 		VkDescriptorPool imguiDescriptorPool;
-		VkDescriptorPool shadowSamplerDescriptorPool;
 		std::vector<VkDescriptorSet> descriptorSets;
 		std::vector<VkDescriptorSet> samplerDescriptorSets;
-		VkDescriptorSet shadowSamplerDescriptorSet;
 
 		// Uniform Buffers (Static for every model)
 		std::vector<VkBuffer> vpUniformBuffer;
