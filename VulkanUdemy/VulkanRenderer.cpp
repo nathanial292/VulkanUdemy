@@ -1201,23 +1201,49 @@ namespace vulkan {
 
 		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelines.scene);
 		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to create graphics pipeline");
+			throw std::runtime_error("Failed to create scene graphics pipeline");
 		}
+
+		//////////////// Debug quad
+
+		vertexShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/quad.vert.spv");
+		fragShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/quad.frag.spv");
+		vertShaderModule = createShaderModule(vertexShaderCode);
+		fragShaderModule = createShaderModule(fragShaderCode);
+		vertShaderCreateInfo.module = vertShaderModule;
+		fragShaderCreateInfo.module = fragShaderModule;
+		shaderStages[0] = vertShaderCreateInfo;
+		shaderStages[1] = fragShaderCreateInfo;
+
+		VkPipelineLayoutCreateInfo debugPipelineLayoutCreateInfo = {};
+		debugPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		debugPipelineLayoutCreateInfo.setLayoutCount = 1;
+		debugPipelineLayoutCreateInfo.pSetLayouts = &shadowSamplerSetLayout;
+		debugPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
+		debugPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
+
+		// Create Pipeline Layout
+		result = vkCreatePipelineLayout(mainDevice.logicalDevice, &debugPipelineLayoutCreateInfo, nullptr, &debugLayout);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create pipeline layout");
+		}
+
+		VkPipelineVertexInputStateCreateInfo emptyInputState = {};
+		emptyInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		pipelineCreateInfo.pVertexInputState = &emptyInputState;
+		pipelineCreateInfo.layout = debugLayout;
+		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelines.debug);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create debug graphics pipeline");
+		}
+
 
 		///////////////////// Offscreen pipeline for shadows
 		// Read in SPIR-V code of shaders
 		vertexShaderCode = readFile("../VulkanUdemy/VulkanUdemy/shaders/offscreen.vert.spv");
-
 		// Build shader Modules to link to graphics pipeline
 		vertShaderModule = createShaderModule(vertexShaderCode);
-
-		// SHADER STAGE CREATION INFORMATION
-		// Vertex stage creation information
-		vertShaderCreateInfo = {};
-		vertShaderCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-		vertShaderCreateInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
 		vertShaderCreateInfo.module = vertShaderModule;
-		vertShaderCreateInfo.pName = "main";
 
 		VkPipelineShaderStageCreateInfo offscreenShaderStages[] = { vertShaderCreateInfo };
 
@@ -1248,8 +1274,12 @@ namespace vulkan {
 		pipelineCreateInfo.layout = offscreenPipelineLayout;
 		pipelineCreateInfo.pStages = offscreenShaderStages; // List of shader stages
 		pipelineCreateInfo.stageCount = 1; // Number of shader stages (vertex, fragment)
+		pipelineCreateInfo.pVertexInputState = &vertexInputCreateInfo;
 
 		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelines.offscreen);
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("Failed to create offscreen graphics pipeline");
+		}
 
 		// Destroy shader modules after pipeline (no longer needed after pipeline created)
 		vkDestroyShaderModule(mainDevice.logicalDevice, vertShaderModule, nullptr);
@@ -2032,9 +2062,17 @@ namespace vulkan {
 				scissor.offset.y = 0;
 				vkCmdSetScissor(commandBuffers[currentImage], 0, 1, &scissor);
 
+				// Debug quad
+				if (displayShadowQuad)
+				{
+					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, debugLayout, 0,
+						1, &shadowSamplerDescriptorSet, 0, nullptr);
+					vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.debug);
+					vkCmdDraw(commandBuffers[currentImage], 3, 1, 0, 0);
+				}
+
 				// Bind Pipeline to be used in renderpass
 				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.scene);
-
 				
 				for (size_t j = 0; j < modelList.size(); j++) {
 					MeshModel thisModel = modelList[j];

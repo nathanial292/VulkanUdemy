@@ -1,3 +1,5 @@
+#pragma once
+
 #define GLFW_INCLUDE_VULKAN
 
 #include "../../API Wrapper/Window.h"
@@ -32,19 +34,15 @@
 #endif
 
 // Shadowmap properties
-#if defined(__ANDROID__)
-#define SHADOWMAP_DIM 1024
-#else
 #define SHADOWMAP_DIM 2048
-#endif
 #define DEFAULT_SHADOWMAP_FILTER VK_FILTER_LINEAR
-
-//bool displayShadowMap = true;
 
 namespace vulkan {
 	class VulkanRenderer
 	{
 	public:
+		bool displayShadowQuad = true;
+
 		VulkanRenderer();
 
 		int init(Window* window, Camera* camera, int sampleCount);
@@ -273,6 +271,7 @@ namespace vulkan {
 
 		// Pipeline
 		VkPipelineLayout pipelineLayout;
+		VkPipelineLayout debugLayout;
 		VkPipelineLayout offscreenPipelineLayout;
 		VkRenderPass renderPass;
 		VkRenderPass imguiRenderPass;
