@@ -4,7 +4,7 @@ layout(location = 0) in vec3 fragCol;
 layout(location = 1) in vec2 fragTex;
 layout(location = 2) in vec3 Normal;
 layout(location = 3) in vec3 FragPos;
-layout(location = 4) in vec4 shadowCoord;
+layout(location = 4) in vec4 inShadowCoord;
  
 layout(set = 1, binding = 0) uniform sampler2D textureSampler;
 layout(set = 2, binding = 0) uniform sampler2D shadowMap;
@@ -41,8 +41,8 @@ layout(push_constant) uniform PushModel {
 } pushModel;
 
 float CalcDirectionalShadowFactor()
-{
-	vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
+{ 
+	vec3 projCoords = inShadowCoord.xyz / inShadowCoord.w;
 	projCoords = (projCoords * 0.5) + 0.5; // Scale between 0 and 1 from -1 and 1
 	
 	float current = projCoords.z;
@@ -87,7 +87,7 @@ float textureProj(vec4 shadowCoord, vec2 off)
 	return shadow;
 }
 
-vec4 CalcLightByDirection()
+vec4 CalcLightByDirection(float shadowFactor)
 {
 	vec3 colour = vec3(directionalLight.colourR, directionalLight.colourG, directionalLight.colourB);
 	vec3 direction = vec3(directionalLight.directionX, directionalLight.directionY, directionalLight.directionZ); 
@@ -114,15 +114,14 @@ vec4 CalcLightByDirection()
 		}
 	}
 	
-	return (ambientColour + (1.0 - 0.0) * (diffuseColour + specularColour));
+	return (ambientColour + (1.0 - shadowFactor) * (diffuseColour + specularColour));
 }
 
 vec4 CalcDirectionalLight()
 {
-	//float shadowFactor = CalcDirectionalShadowFactor();
-	//float shadow = textureProj(shadowCoord / shadowCoord.w, vec2(0.0));
-	float shadow = CalcDirectionalShadowFactor();
-	return CalcLightByDirection() * shadow;
+	//float shadowFactor = textureProj(inShadowCoord / inShadowCoord.w, vec2(0.0));
+	float shadowFactor = CalcDirectionalShadowFactor();
+	return CalcLightByDirection(shadowFactor);
 }
 
 void main() 

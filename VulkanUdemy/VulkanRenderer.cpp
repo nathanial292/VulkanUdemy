@@ -22,7 +22,7 @@ namespace vulkan {
 			createLogicalDevice();
 			createCommandPool();
 			createSwapChain();
-			createDepthBufferImage();
+			createDepthStencil();
 			createColourImage();
 			createRenderPass();
 			createOffscreenRenderPass(); // Shadow renderpass
@@ -63,7 +63,7 @@ namespace vulkan {
 
 		cleanupSwapChain();
 		createSwapChain();
-		createDepthBufferImage();
+		createDepthStencil();
 		createColourImage();
 		createRenderPass();
 		createImguiRenderPass();
@@ -147,9 +147,9 @@ namespace vulkan {
 		vkDestroyRenderPass(mainDevice.logicalDevice, imguiRenderPass, nullptr);
 
 		// Cleanup for depth buffer
-		vkDestroyImageView(mainDevice.logicalDevice, depthBufferImageView, nullptr);
-		vkDestroyImage(mainDevice.logicalDevice, depthBufferImage, nullptr);
-		vkFreeMemory(mainDevice.logicalDevice, depthBufferImageMemory, nullptr);
+		vkDestroyImageView(mainDevice.logicalDevice, depthStencilImageView, nullptr);
+		vkDestroyImage(mainDevice.logicalDevice, depthStencilImage, nullptr);
+		vkFreeMemory(mainDevice.logicalDevice, depthStencilImageMemory, nullptr);
 
 		// Cleanup for colour buffer
 		vkDestroyImageView(mainDevice.logicalDevice, colourImageView, nullptr);
@@ -212,10 +212,7 @@ namespace vulkan {
 		uboViewProjection.projection = projection;
 		uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
 		uboViewProjection.view = viewMatrix;
-
-		glm::mat4 depthProjectionMatrix = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
-		glm::mat4 depthViewMatrix = glm::lookAt(directionalLight->getPosition(), glm::vec3(0.0f), glm::vec3(0, 1, 0));
-		uboViewProjection.lightTransform = depthProjectionMatrix * depthViewMatrix;
+		uboViewProjection.lightTransform = directionalLight->CalculateLightTransform();
 
 		updateUniformBuffers(imageIndex);
 		recordCommands(imageIndex); // Rerecord commands every draw
@@ -961,8 +958,8 @@ namespace vulkan {
 	void VulkanRenderer::createOffscreenRenderPass()
 	{
 		VkAttachmentDescription attachmentDescription = {};
-		attachmentDescription.format = VK_FORMAT_D16_UNORM;
-		attachmentDescription.samples = msaaSamples;
+		attachmentDescription.format = depthBufferFormat;
+		attachmentDescription.samples = VK_SAMPLE_COUNT_1_BIT;
 		attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;							// Clear depth at beginning of the render pass
 		attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE;						// We will read from depth, so it's important to store the depth attachment results
 		attachmentDescription.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -1244,8 +1241,9 @@ namespace vulkan {
 		dyanamicStateEnables.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dyanamicStateEnables.size());
 		dynamicStateCreateInfo.pDynamicStates = dyanamicStateEnables.data();
+		dynamicStateCreateInfo.pNext = 0;
 		multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
-		multisampleCreateInfo.rasterizationSamples = msaaSamples;
+		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		pipelineCreateInfo.renderPass = shadowRenderPass;
 		pipelineCreateInfo.layout = offscreenPipelineLayout;
 		pipelineCreateInfo.pStages = offscreenShaderStages; // List of shader stages
@@ -1257,10 +1255,8 @@ namespace vulkan {
 		vkDestroyShaderModule(mainDevice.logicalDevice, vertShaderModule, nullptr);
 		vkDestroyShaderModule(mainDevice.logicalDevice, fragShaderModule, nullptr);
 	}
-
-	void VulkanRenderer::createDepthBufferImage()
+	void VulkanRenderer::createDepthStencil()
 	{
-		
 		// Get supported format for depth buffer 
 		depthBufferFormat = chooseSupportedFormat(
 			{ VK_FORMAT_D16_UNORM, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D32_SFLOAT, VK_FORMAT_D24_UNORM_S8_UINT },
@@ -1268,13 +1264,13 @@ namespace vulkan {
 			VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
 
 		// Create the depth buffer image
-		depthBufferImage = createImage(SHADOWMAP_DIM, SHADOWMAP_DIM, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthBufferImageMemory, msaaSamples);
+		depthStencilImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthStencilImageMemory, msaaSamples);
 
 		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
 		//generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
 
 		// Create depth buffer image view
-		depthBufferImageView = createImageView(depthBufferImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+		depthStencilImageView = createImageView(depthStencilImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 	}
 
 	void VulkanRenderer::createFrameBuffers()
@@ -1285,7 +1281,7 @@ namespace vulkan {
 
 			std::array<VkImageView, 3> attachments = {
 				colourImageView,
-				depthBufferImageView,
+				depthStencilImageView,
 				swapChainImages[i].imageView
 			};
 
@@ -1327,6 +1323,15 @@ namespace vulkan {
 
 	void VulkanRenderer::createOffscreenFrameBuffer()
 	{
+		// Create the depth buffer image
+		depthShadowImage = createImage(SHADOWMAP_DIM, SHADOWMAP_DIM, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthShadowImageMemory, VK_SAMPLE_COUNT_1_BIT);
+
+		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+		//generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
+
+		// Create depth buffer image view
+		depthShadowImageView = createImageView(depthShadowImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+
 		// Create shadow sampler to sample from depth attachment
 		VkSamplerCreateInfo samplerCreateInfo = {};
 		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -1352,7 +1357,7 @@ namespace vulkan {
 		frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 		frameBufferCreateInfo.renderPass = shadowRenderPass; // Renderpass layout the framebuffer will be used with
 		frameBufferCreateInfo.attachmentCount = 1;
-		frameBufferCreateInfo.pAttachments = &depthBufferImageView; // List of attachments 1-to-1 with renderpass
+		frameBufferCreateInfo.pAttachments = &depthShadowImageView; // List of attachments 1-to-1 with renderpass
 		frameBufferCreateInfo.width = SHADOWMAP_DIM; // Framebuffer width
 		frameBufferCreateInfo.height = SHADOWMAP_DIM; // Framebuffer height
 		frameBufferCreateInfo.layers = 1; // Framebuffer layers
@@ -1759,7 +1764,7 @@ namespace vulkan {
 		// Shadow image info
 		VkDescriptorImageInfo shadowMapInfo = {};
 		shadowMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		shadowMapInfo.imageView = depthBufferImageView;
+		shadowMapInfo.imageView = depthShadowImageView;
 		shadowMapInfo.sampler = shadowDepthSampler;
 
 		// Shadow Write Info

@@ -35,7 +35,7 @@
 #if defined(__ANDROID__)
 #define SHADOWMAP_DIM 1024
 #else
-#define SHADOWMAP_DIM 8192
+#define SHADOWMAP_DIM 2048
 #endif
 #define DEFAULT_SHADOWMAP_FILTER VK_FILTER_LINEAR
 
@@ -64,7 +64,7 @@ namespace vulkan {
 		void setupDebugMessenger();
 		void createSurface();
 		void createSwapChain();
-		void createDepthBufferImage();
+		void createDepthStencil();
 		void createRenderPass();
 		void createOffscreenRenderPass();
 		void createImguiRenderPass();
@@ -223,10 +223,17 @@ namespace vulkan {
 		std::vector<VkCommandBuffer> imguiCommandBuffers;
 
 		// Depth buffer class members
-		VkImage depthBufferImage;
-		VkDeviceMemory depthBufferImageMemory;
-		VkImageView depthBufferImageView;
 		VkFormat depthBufferFormat;
+
+		// Shadow depth (SHADOWMAP_DIM height/width)
+		VkImage depthShadowImage;
+		VkDeviceMemory depthShadowImageMemory;
+		VkImageView depthShadowImageView;
+
+		// Depth stencil (Full width/height)
+		VkImage depthStencilImage;
+		VkDeviceMemory depthStencilImageMemory;
+		VkImageView depthStencilImageView;
 
 		// Multisample class members
 		VkImage colourImage;

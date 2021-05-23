@@ -23,6 +23,12 @@ layout(location = 2) out vec3 Normal;
 layout(location = 3) out vec3 FragPos;
 layout(location = 4) out vec4 outShadowCoord;
 
+const mat4 biasMat = mat4( 
+	0.5, 0.0, 0.0, 0.0,
+	0.0, 0.5, 0.0, 0.0,
+	0.0, 0.0, 1.0, 0.0,
+	0.5, 0.5, 0.0, 1.0 );
+
 void main() {
 	gl_Position = uboViewProjection.projection * uboViewProjection.view * pushModel.model * vec4(pos, 1.0);
 	
@@ -32,5 +38,5 @@ void main() {
 	fragCol = col;
 	fragTex = tex;
 
-	outShadowCoord = ( uboViewProjection.lightSpace * pushModel.model ) * vec4(pos, 1.0);	
+	outShadowCoord = uboViewProjection.lightSpace * pushModel.model * vec4(pos, 1.0);	
 }
