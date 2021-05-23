@@ -951,7 +951,7 @@ namespace vulkan {
 		renderPassInfo.pDependencies = &dependency;
 
 		if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassInfo, nullptr, &renderPass) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create render pass!");
+			throw std::runtime_error("Failed to create render pass!");
 		}
 	}
 
@@ -1005,7 +1005,7 @@ namespace vulkan {
 		renderPassCreateInfo.pDependencies = dependencies.data();
 
 		if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassCreateInfo, nullptr, &offscreenPass.renderPass) != VK_SUCCESS) {
-			throw std::runtime_error("failed to create render pass!");
+			throw std::runtime_error("Failed to create offscreen render pass");
 		}
 	}
 
@@ -1232,6 +1232,8 @@ namespace vulkan {
 		emptyInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		pipelineCreateInfo.pVertexInputState = &emptyInputState;
 		pipelineCreateInfo.layout = debugLayout;
+		multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
+		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelines.debug);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create debug graphics pipeline");
@@ -1267,9 +1269,6 @@ namespace vulkan {
 		dyanamicStateEnables.push_back(VK_DYNAMIC_STATE_DEPTH_BIAS);
 		dynamicStateCreateInfo.dynamicStateCount = static_cast<uint32_t>(dyanamicStateEnables.size());
 		dynamicStateCreateInfo.pDynamicStates = dyanamicStateEnables.data();
-		dynamicStateCreateInfo.pNext = 0;
-		multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
-		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		pipelineCreateInfo.renderPass = offscreenPass.renderPass;
 		pipelineCreateInfo.layout = offscreenPipelineLayout;
 		pipelineCreateInfo.pStages = offscreenShaderStages; // List of shader stages
