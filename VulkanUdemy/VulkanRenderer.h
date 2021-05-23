@@ -34,7 +34,7 @@
 #endif
 
 // Shadowmap properties
-#define SHADOWMAP_DIM 2048
+#define SHADOWMAP_DIM 8192
 #define DEFAULT_SHADOWMAP_FILTER VK_FILTER_LINEAR
 
 namespace vulkan {
