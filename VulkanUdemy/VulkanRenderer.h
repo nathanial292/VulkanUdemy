@@ -41,7 +41,7 @@ namespace vulkan {
 	class VulkanRenderer
 	{
 	public:
-		bool displayShadowQuad = true;
+		bool displayShadowQuad = false;
 
 		VulkanRenderer();
 

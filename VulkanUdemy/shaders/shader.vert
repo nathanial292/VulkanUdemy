@@ -38,5 +38,5 @@ void main() {
 	fragCol = col;
 	fragTex = tex;
 
-	outShadowCoord = uboViewProjection.lightSpace * pushModel.model * vec4(pos, 1.0);	
+	outShadowCoord = biasMat * uboViewProjection.lightSpace * pushModel.model * vec4(pos, 1.0);	
 }

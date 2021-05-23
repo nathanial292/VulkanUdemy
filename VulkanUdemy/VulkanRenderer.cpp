@@ -213,6 +213,7 @@ namespace vulkan {
 		uboViewProjection.projection[1][1] *= -1; // Invert the y axis for vulkan (GLM was made for opengl which uses +y as up)
 		uboViewProjection.view = viewMatrix;
 		uboViewProjection.lightTransform = directionalLight->CalculateLightTransform();
+		//uboViewProjection.lightTransform[1][1] *= -1;
 
 		updateUniformBuffers(imageIndex);
 		recordCommands(imageIndex); // Rerecord commands every draw
@@ -1295,8 +1296,8 @@ namespace vulkan {
 		// Create the depth buffer image
 		depthStencilImage = createImage(swapChainExtent.width, swapChainExtent.height, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthStencilImageMemory, msaaSamples);
 
-		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
-		//generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
+		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, depthStencilImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+		//generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, depthStencilImage, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
 
 		// Create depth buffer image view
 		depthStencilImageView = createImageView(depthStencilImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -1355,8 +1356,8 @@ namespace vulkan {
 		// Create the depth buffer image
 		offscreenPass.depth.image = createImage(SHADOWMAP_DIM, SHADOWMAP_DIM, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &offscreenPass.depth.mem, VK_SAMPLE_COUNT_1_BIT);
 
-		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
-		//generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
+		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, offscreenPass.depth.image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
+		//generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, offscreenPass.depth.image, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
 
 		// Create depth buffer image view
 		offscreenPass.depth.view = createImageView(offscreenPass.depth.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -1929,19 +1930,19 @@ namespace vulkan {
 			throw std::runtime_error("Failed to start recording to a command buffer!");
 		}
 
-		// Define renderpass struct
-		// For offscreen
-		std::array<VkClearValue, 2> clearValues = {};
-		clearValues[0].depthStencil = { 1.0f, 0 };
+			// Define renderpass struct
+			// For offscreen
+			std::array<VkClearValue, 2> clearValues = {};
+			clearValues[0].depthStencil = { 1.0f, 0 };
 
-		VkRenderPassBeginInfo renderPassBeginInfo = {};
-		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = offscreenPass.renderPass;
-		renderPassBeginInfo.framebuffer = offscreenPass.frameBuffer;
-		renderPassBeginInfo.renderArea.extent.width = SHADOWMAP_DIM;
-		renderPassBeginInfo.renderArea.extent.height = SHADOWMAP_DIM;
-		renderPassBeginInfo.clearValueCount = 1;
-		renderPassBeginInfo.pClearValues = clearValues.data(); // List of clear values
+			VkRenderPassBeginInfo renderPassBeginInfo = {};
+			renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassBeginInfo.renderPass = offscreenPass.renderPass;
+			renderPassBeginInfo.framebuffer = offscreenPass.frameBuffer;
+			renderPassBeginInfo.renderArea.extent.width = SHADOWMAP_DIM;
+			renderPassBeginInfo.renderArea.extent.height = SHADOWMAP_DIM;
+			renderPassBeginInfo.clearValueCount = 1;
+			renderPassBeginInfo.pClearValues = clearValues.data(); // List of clear values
 
 			vkCmdBeginRenderPass(commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
@@ -2019,31 +2020,21 @@ namespace vulkan {
 
 			vkCmdEndRenderPass(commandBuffers[currentImage]);
 
-		result = vkEndCommandBuffer(commandBuffers[currentImage]);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to stop recording to a command buffer!");
-		}
+			////////////////////////////////////////
 
-		////////////////////////////////////////
-
-		// Actual 3D Draw
-		// Information about how to begin a render pass (only needed for graphical applications)
-		renderPassBeginInfo = {};
-		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = renderPass;
-		renderPassBeginInfo.framebuffer = swapChainFramebuffers[currentImage];
-		renderPassBeginInfo.renderArea.offset = { 0, 0 };
-		renderPassBeginInfo.renderArea.extent.width = swapChainExtent.width;
-		renderPassBeginInfo.renderArea.extent.height = swapChainExtent.height;
-		clearValues[0].color = { 0.1f, 0.1f, 0.1f, 1.0f }; // Color attachment clear value
-		clearValues[1].depthStencil = { 1.0f, 0 };
-		renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-		renderPassBeginInfo.pClearValues = clearValues.data(); // List of clear values
-
-		result = vkBeginCommandBuffer(commandBuffers[currentImage], &bufferBeginInfo);
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("Failed to start recording to a command buffer!");
-		}
+			// Actual 3D Draw
+			// Information about how to begin a render pass (only needed for graphical applications)
+			renderPassBeginInfo = {};
+			renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+			renderPassBeginInfo.renderPass = renderPass;
+			renderPassBeginInfo.framebuffer = swapChainFramebuffers[currentImage];
+			renderPassBeginInfo.renderArea.offset = { 0, 0 };
+			renderPassBeginInfo.renderArea.extent.width = swapChainExtent.width;
+			renderPassBeginInfo.renderArea.extent.height = swapChainExtent.height;
+			clearValues[0].color = { 0.1f, 0.1f, 0.1f, 1.0f }; // Color attachment clear value
+			clearValues[1].depthStencil = { 1.0f, 0 };
+			renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+			renderPassBeginInfo.pClearValues = clearValues.data(); // List of clear values
 
 			vkCmdBeginRenderPass(commandBuffers[currentImage], &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 

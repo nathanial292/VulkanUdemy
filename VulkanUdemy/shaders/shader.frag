@@ -87,7 +87,30 @@ float textureProj(vec4 shadowCoord, vec2 off)
 	return shadow;
 }
 
-vec4 CalcLightByDirection(float shadowFactor)
+float filterPCF(vec4 sc)
+{
+	ivec2 texDim = textureSize(shadowMap, 0);
+	float scale = 1.5;
+	float dx = scale * 1.0 / float(texDim.x);
+	float dy = scale * 1.0 / float(texDim.y);
+
+	float shadowFactor = 0.0;
+	int count = 0;
+	int range = 1;
+	
+	for (int x = -range; x <= range; x++)
+	{
+		for (int y = -range; y <= range; y++)
+		{
+			shadowFactor += textureProj(sc, vec2(dx*x, dy*y));
+			count++;
+		}
+	
+	}
+	return shadowFactor / count;
+}
+
+vec4 CalcLightByDirection()
 {
 	vec3 colour = vec3(directionalLight.colourR, directionalLight.colourG, directionalLight.colourB);
 	vec3 direction = vec3(directionalLight.directionX, directionalLight.directionY, directionalLight.directionZ); 
@@ -114,14 +137,15 @@ vec4 CalcLightByDirection(float shadowFactor)
 		}
 	}
 	
-	return (ambientColour + (1.0 - shadowFactor) * (diffuseColour + specularColour));
+	return (ambientColour + diffuseColour + specularColour);
 }
 
 vec4 CalcDirectionalLight()
 {
+	float shadowFactor = filterPCF(inShadowCoord / inShadowCoord.w);
 	//float shadowFactor = textureProj(inShadowCoord / inShadowCoord.w, vec2(0.0));
-	float shadowFactor = CalcDirectionalShadowFactor();
-	return CalcLightByDirection(shadowFactor);
+	//float shadowFactor = CalcDirectionalShadowFactor();
+	return CalcLightByDirection() * shadowFactor;
 }
 
 void main() 
