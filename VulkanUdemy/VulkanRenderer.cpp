@@ -141,7 +141,7 @@ namespace vulkan {
 		for (auto framebuffer : imguiFrameBuffers) {
 			vkDestroyFramebuffer(mainDevice.logicalDevice, framebuffer, nullptr);
 		}
-		vkDestroyPipeline(mainDevice.logicalDevice, graphicsPipeline, nullptr);
+		vkDestroyPipeline(mainDevice.logicalDevice, pipelines.scene, nullptr);
 		vkDestroyPipelineLayout(mainDevice.logicalDevice, pipelineLayout, nullptr);
 		vkDestroyRenderPass(mainDevice.logicalDevice, renderPass, nullptr);
 		vkDestroyRenderPass(mainDevice.logicalDevice, imguiRenderPass, nullptr);
@@ -1004,7 +1004,7 @@ namespace vulkan {
 		renderPassCreateInfo.dependencyCount = static_cast<uint32_t>(dependencies.size());
 		renderPassCreateInfo.pDependencies = dependencies.data();
 
-		if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassCreateInfo, nullptr, &shadowRenderPass) != VK_SUCCESS) {
+		if (vkCreateRenderPass(mainDevice.logicalDevice, &renderPassCreateInfo, nullptr, &offscreenPass.renderPass) != VK_SUCCESS) {
 			throw std::runtime_error("failed to create render pass!");
 		}
 	}
@@ -1199,7 +1199,7 @@ namespace vulkan {
 		pipelineCreateInfo.basePipelineHandle = VK_NULL_HANDLE; // Existing pipeline to derive from
 		pipelineCreateInfo.basePipelineIndex = -1; // Or index of pipeline being created to derive from (in case creating multiple at once) 
 
-		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &graphicsPipeline);
+		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelines.scene);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create graphics pipeline");
 		}
@@ -1244,12 +1244,12 @@ namespace vulkan {
 		dynamicStateCreateInfo.pNext = 0;
 		multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
 		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-		pipelineCreateInfo.renderPass = shadowRenderPass;
+		pipelineCreateInfo.renderPass = offscreenPass.renderPass;
 		pipelineCreateInfo.layout = offscreenPipelineLayout;
 		pipelineCreateInfo.pStages = offscreenShaderStages; // List of shader stages
 		pipelineCreateInfo.stageCount = 1; // Number of shader stages (vertex, fragment)
 
-		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &offscreenPipeline);
+		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelines.offscreen);
 
 		// Destroy shader modules after pipeline (no longer needed after pipeline created)
 		vkDestroyShaderModule(mainDevice.logicalDevice, vertShaderModule, nullptr);
@@ -1324,13 +1324,13 @@ namespace vulkan {
 	void VulkanRenderer::createOffscreenFrameBuffer()
 	{
 		// Create the depth buffer image
-		depthShadowImage = createImage(SHADOWMAP_DIM, SHADOWMAP_DIM, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &depthShadowImageMemory, VK_SAMPLE_COUNT_1_BIT);
+		offscreenPass.depth.image = createImage(SHADOWMAP_DIM, SHADOWMAP_DIM, 1, depthBufferFormat, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, &offscreenPass.depth.mem, VK_SAMPLE_COUNT_1_BIT);
 
 		//transitionImageLayout(mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mipLevels);
 		//generateMipmaps(mainDevice, graphicsQueue, graphicsCommandPool, depthBufferImage, VK_FORMAT_D16_UNORM, swapChainExtent.width, swapChainExtent.height, mipLevels);
 
 		// Create depth buffer image view
-		depthShadowImageView = createImageView(depthShadowImage, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
+		offscreenPass.depth.view = createImageView(offscreenPass.depth.image, depthBufferFormat, VK_IMAGE_ASPECT_DEPTH_BIT);
 
 		// Create shadow sampler to sample from depth attachment
 		VkSamplerCreateInfo samplerCreateInfo = {};
@@ -1347,7 +1347,7 @@ namespace vulkan {
 		samplerCreateInfo.maxAnisotropy = 1.0f; // Sample level of anisotropy
 		samplerCreateInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE; // Border beyond texture, only works for border clamp
 
-		VkResult result = vkCreateSampler(mainDevice.logicalDevice, &samplerCreateInfo, nullptr, &shadowDepthSampler);
+		VkResult result = vkCreateSampler(mainDevice.logicalDevice, &samplerCreateInfo, nullptr, &offscreenPass.depthSampler);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create sampler");
 		}
@@ -1355,14 +1355,14 @@ namespace vulkan {
 		// Create shadow framebuffer
 		VkFramebufferCreateInfo frameBufferCreateInfo = {};
 		frameBufferCreateInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-		frameBufferCreateInfo.renderPass = shadowRenderPass; // Renderpass layout the framebuffer will be used with
+		frameBufferCreateInfo.renderPass = offscreenPass.renderPass; // Renderpass layout the framebuffer will be used with
 		frameBufferCreateInfo.attachmentCount = 1;
-		frameBufferCreateInfo.pAttachments = &depthShadowImageView; // List of attachments 1-to-1 with renderpass
+		frameBufferCreateInfo.pAttachments = &offscreenPass.depth.view; // List of attachments 1-to-1 with renderpass
 		frameBufferCreateInfo.width = SHADOWMAP_DIM; // Framebuffer width
 		frameBufferCreateInfo.height = SHADOWMAP_DIM; // Framebuffer height
 		frameBufferCreateInfo.layers = 1; // Framebuffer layers
 
-		result = vkCreateFramebuffer(mainDevice.logicalDevice, &frameBufferCreateInfo, nullptr, &shadowFrameBuffer);
+		result = vkCreateFramebuffer(mainDevice.logicalDevice, &frameBufferCreateInfo, nullptr, &offscreenPass.frameBuffer);
 		if (result != VK_SUCCESS) {
 			throw std::runtime_error("Failed to create shadow framebuffer");
 		}
@@ -1764,8 +1764,8 @@ namespace vulkan {
 		// Shadow image info
 		VkDescriptorImageInfo shadowMapInfo = {};
 		shadowMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		shadowMapInfo.imageView = depthShadowImageView;
-		shadowMapInfo.sampler = shadowDepthSampler;
+		shadowMapInfo.imageView = offscreenPass.depth.view;
+		shadowMapInfo.sampler = offscreenPass.depthSampler;
 
 		// Shadow Write Info
 		VkWriteDescriptorSet shadowDescriptorWrite = {};
@@ -1907,8 +1907,8 @@ namespace vulkan {
 
 		VkRenderPassBeginInfo renderPassBeginInfo = {};
 		renderPassBeginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-		renderPassBeginInfo.renderPass = shadowRenderPass;
-		renderPassBeginInfo.framebuffer = shadowFrameBuffer;
+		renderPassBeginInfo.renderPass = offscreenPass.renderPass;
+		renderPassBeginInfo.framebuffer = offscreenPass.frameBuffer;
 		renderPassBeginInfo.renderArea.extent.width = SHADOWMAP_DIM;
 		renderPassBeginInfo.renderArea.extent.height = SHADOWMAP_DIM;
 		renderPassBeginInfo.clearValueCount = 1;
@@ -1937,7 +1937,7 @@ namespace vulkan {
 					1.75 // Depth bias slope
 				);
 
-				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, offscreenPipeline);
+				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.offscreen);
 				for (size_t j = 0; j < modelList.size(); j++) {
 					MeshModel thisModel = modelList[j];
 
@@ -2033,7 +2033,7 @@ namespace vulkan {
 				vkCmdSetScissor(commandBuffers[currentImage], 0, 1, &scissor);
 
 				// Bind Pipeline to be used in renderpass
-				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+				vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.scene);
 
 				
 				for (size_t j = 0; j < modelList.size(); j++) {

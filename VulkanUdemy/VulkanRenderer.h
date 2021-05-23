@@ -39,6 +39,8 @@
 #endif
 #define DEFAULT_SHADOWMAP_FILTER VK_FILTER_LINEAR
 
+//bool displayShadowMap = true;
+
 namespace vulkan {
 	class VulkanRenderer
 	{
@@ -225,11 +227,6 @@ namespace vulkan {
 		// Depth buffer class members
 		VkFormat depthBufferFormat;
 
-		// Shadow depth (SHADOWMAP_DIM height/width)
-		VkImage depthShadowImage;
-		VkDeviceMemory depthShadowImageMemory;
-		VkImageView depthShadowImageView;
-
 		// Depth stencil (Full width/height)
 		VkImage depthStencilImage;
 		VkDeviceMemory depthStencilImageMemory;
@@ -240,12 +237,6 @@ namespace vulkan {
 		VkDeviceMemory colourImageMemory;
 		VkImageView colourImageView;
 
-		// Shadow class members
-		// TODO: Really should use a separate class for this but fuck it for now
-		// Offscreen framebuffer stuff (for shadows)
-		VkFramebuffer shadowFrameBuffer;
-		VkRenderPass shadowRenderPass;
-		VkSampler shadowDepthSampler;
 		VkSampler textureSampler;
 
 		// Assets
@@ -260,14 +251,31 @@ namespace vulkan {
 		// Multisample count
 		VkSampleCountFlagBits msaaSamples;
 
+		struct {
+			VkPipeline scene;
+			VkPipeline debug;
+			VkPipeline offscreen;
+		} pipelines;
+
+		struct FrameBufferAttachment {
+			VkImage image;
+			VkDeviceMemory mem;
+			VkImageView view;
+		};
+
+		struct OffscreenPass {
+			int32_t width, height;
+			VkFramebuffer frameBuffer;
+			FrameBufferAttachment depth;
+			VkRenderPass renderPass;
+			VkSampler depthSampler;
+		} offscreenPass;
+
 		// Pipeline
 		VkPipelineLayout pipelineLayout;
 		VkPipelineLayout offscreenPipelineLayout;
 		VkRenderPass renderPass;
 		VkRenderPass imguiRenderPass;
-
-		VkPipeline graphicsPipeline;
-		VkPipeline offscreenPipeline;
 
 		// Pools
 		VkCommandPool graphicsCommandPool;
