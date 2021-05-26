@@ -11,8 +11,8 @@ namespace vulkan {
 	DirectionalLight::DirectionalLight(glm::vec3 position, glm::vec3 colour, float aIntensity, float dIntensity) : Light(colour, aIntensity, dIntensity)
 	{
 		direction = position;
-		//lightProj = glm::ortho(-20.0f, 20.0f, -20.0f, 20.0f, 0.1f, 100.0f);
-		lightProj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 100.0f);
+		lightProj = glm::ortho(-40.0f, 40.0f, -40.0f, 40.0f, 0.1f, 100.0f);
+		//lightProj = glm::perspective(glm::radians(45.0f), 1.0f, 0.1f, 100.0f);
 	}
 
 	UniformLight DirectionalLight::getLight()
@@ -32,7 +32,7 @@ namespace vulkan {
 
 	glm::mat4 DirectionalLight::CalculateLightTransform()
 	{
-		glm::mat4 returnValue = lightProj * glm::lookAt(direction, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::mat4 returnValue = lightProj * glm::lookAt(direction, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * glm::mat4(1.0f);
 		//returnValue[1][1] *= -1;
 		return returnValue;
 	}

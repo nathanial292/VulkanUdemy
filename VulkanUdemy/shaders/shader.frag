@@ -41,10 +41,11 @@ layout(push_constant) uniform PushModel {
 } pushModel;
 
 float CalcDirectionalShadowFactor()
-{ 
+{
 	vec3 projCoords = inShadowCoord.xyz / inShadowCoord.w;
 	projCoords = (projCoords * 0.5) + 0.5; // Scale between 0 and 1 from -1 and 1
 	
+	//float closest = texture(directionalShadowMap, projCoords.xy).r;
 	float current = projCoords.z;
 	
 	vec3 normal = normalize(Normal);
@@ -72,6 +73,7 @@ float CalcDirectionalShadowFactor()
 	
 	return shadow;
 }
+
 
 float textureProj(vec4 shadowCoord, vec2 off)
 {
@@ -139,6 +141,7 @@ vec4 CalcLightByDirection(float shadowFactor)
 	
 	return (ambientColour + (diffuseColour * shadowFactor) + specularColour);
 }
+
 
 vec4 CalcDirectionalLight()
 {

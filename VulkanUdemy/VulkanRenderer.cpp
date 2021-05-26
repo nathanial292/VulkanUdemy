@@ -1216,10 +1216,12 @@ namespace vulkan {
 		shaderStages[0] = vertShaderCreateInfo;
 		shaderStages[1] = fragShaderCreateInfo;
 
+		std::array<VkDescriptorSet, 1> debugDescriptors = { shadowSamplerSetLayout };
+
 		VkPipelineLayoutCreateInfo debugPipelineLayoutCreateInfo = {};
 		debugPipelineLayoutCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		debugPipelineLayoutCreateInfo.setLayoutCount = 1;
-		debugPipelineLayoutCreateInfo.pSetLayouts = &shadowSamplerSetLayout;
+		debugPipelineLayoutCreateInfo.pSetLayouts = debugDescriptors.data();
 		debugPipelineLayoutCreateInfo.pushConstantRangeCount = 0;
 		debugPipelineLayoutCreateInfo.pPushConstantRanges = nullptr;
 
@@ -1233,7 +1235,7 @@ namespace vulkan {
 		emptyInputState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 		pipelineCreateInfo.pVertexInputState = &emptyInputState;
 		pipelineCreateInfo.layout = debugLayout;
-		multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
+		//multisampleCreateInfo.sampleShadingEnable = VK_FALSE;
 		multisampleCreateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		result = vkCreateGraphicsPipelines(mainDevice.logicalDevice, VK_NULL_HANDLE, 1, &pipelineCreateInfo, nullptr, &pipelines.debug);
 		if (result != VK_SUCCESS) {
@@ -1367,7 +1369,7 @@ namespace vulkan {
 		samplerCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 		samplerCreateInfo.magFilter = VK_FILTER_LINEAR; // How to render when image is magnified on screen
 		samplerCreateInfo.minFilter = VK_FILTER_LINEAR; // How to render when image is minified on screen
-		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		samplerCreateInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		samplerCreateInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerCreateInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		samplerCreateInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -2020,8 +2022,6 @@ namespace vulkan {
 
 			vkCmdEndRenderPass(commandBuffers[currentImage]);
 
-			////////////////////////////////////////
-
 			// Actual 3D Draw
 			// Information about how to begin a render pass (only needed for graphical applications)
 			renderPassBeginInfo = {};
@@ -2055,8 +2055,28 @@ namespace vulkan {
 				// Debug quad
 				if (displayShadowQuad)
 				{
-					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, debugLayout, 0,
-						1, &shadowSamplerDescriptorSet, 0, nullptr);
+					
+					std::vector<Vertex> vertices = {
+						{ { -1.0, -1.0, 1.0 }, { 1.0, 0.0, 1.0 }, { 0.0, 0.0 }, { 0.0, 0.0, 0.0 }}, // 0
+						{ { 1.0, -1.0, 1.0 }, { 1.0, 0.0, 1.0 }, { 1.0, 0.0 }, { 0.0, 0.0, 0.0 }},
+						{ { -1.0, 1.0, 1.0 }, { 1.0, 0.0, 1.0 }, { 0.0, 1.0 }, { 0.0, 0.0, 0.0 }},
+						{ { 1.0, 1.0, 1.0 }, { 1.0, 0.0, 1.0 }, { 1.0, 1.0 }, { 0.0, 0.0, 0.0 }},
+					};
+
+					std::vector<uint32_t> indices = 
+					{
+						1,3,2, 2,0,1,  //Face front
+					};
+
+					Mesh mesh = Mesh(mainDevice.physicalDevice, mainDevice.logicalDevice, graphicsQueue, graphicsCommandPool, &indices, &vertices);
+					VkBuffer vertexBuffers[] = { mesh.getVertexBuffer() }; // Buffers to bind
+					VkDeviceSize offsets[] = { 0 }; // Offsets into buffers being bound
+					vkCmdBindVertexBuffers(commandBuffers[currentImage], 0, 1, vertexBuffers, offsets);
+					
+					uint32_t dynamicOffset = static_cast<uint32_t>(modelUniformAlignment) * 1;
+					std::array<VkDescriptorSet, 3> debugDescriptors = { descriptorSets[currentFrame], samplerDescriptorSets[0], shadowSamplerDescriptorSet };
+					vkCmdBindDescriptorSets(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0,
+						3, debugDescriptors.data(), 1, &dynamicOffset);
 					vkCmdBindPipeline(commandBuffers[currentImage], VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.debug);
 					vkCmdDraw(commandBuffers[currentImage], 3, 1, 0, 0);
 				}
